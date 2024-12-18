@@ -55,6 +55,26 @@ const LibraryOccupancy = () => {
     fetchData();
   }, []);
 
+  // Function to generate a color: green → orange → red
+  const getColorFromOccupancy = (occupancy) => {
+    if (occupancy <= 50) {
+      // Green to Orange gradient (0–50%)
+      const green = 255;
+      const red = Math.floor((occupancy / 50) * 255); // Red increases
+      return `rgb(${red}, ${green}, 0)`;
+    } else if (occupancy <= 80) {
+      // Orange (50–80%) - Transition to full orange
+      const red = 255;
+      const green = Math.floor(255 - ((occupancy - 50) / 30) * 128); // Green decreases
+      return `rgb(${red}, ${green}, 0)`;
+    } else {
+      // Orange to Red gradient (80–100%)
+      const red = 255;
+      const green = Math.floor(127 - ((occupancy - 80) / 20) * 127); // Green decreases further
+      return `rgb(${red}, ${green}, 0)`;
+    }
+  };
+
   if (loading) return <div className="text-center mt-10">Loading...</div>;
   if (error) return <div className="text-red-500">{error}</div>;
 
@@ -66,7 +86,13 @@ const LibraryOccupancy = () => {
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-2xl font-bold text-gray-700">Newton</h3>
           <div className="text-xl font-semibold text-gray-500">
-            Current occupancy: <span className="text-yellow-500">{currentOccupancy}%</span>
+            Current occupancy:{' '}
+            <span
+              className="text-3xl font-bold"
+              style={{ color: getColorFromOccupancy(currentOccupancy) }} // Dynamic color
+            >
+              {currentOccupancy}%
+            </span>
           </div>
         </div>
 
@@ -85,9 +111,7 @@ const LibraryOccupancy = () => {
                 tickFormatter={(value) => `${value}%`}
                 tickLine={false}
               />
-              <Tooltip
-                formatter={(value) => [`${value}%`, 'Occupancy']}
-              />
+              <Tooltip formatter={(value) => [`${value}%`, 'Occupancy']} />
               <Bar dataKey="occupancy" radius={[4, 4, 0, 0]}>
                 {occupancyData.map((entry) => (
                   <Cell
