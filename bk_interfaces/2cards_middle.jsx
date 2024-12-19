@@ -71,21 +71,6 @@ const LibraryOccupancy = () => {
     }
   };
 
-  // Custom tooltip component
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white/90 backdrop-blur-sm shadow-lg rounded-lg p-3 border border-gray-200">
-          <p className="font-semibold text-gray-900">Time: {label}</p>
-          <p className="font-medium" style={{ color: getColorFromOccupancy(payload[0].value) }}>
-            Occupancy: {payload[0].value}%
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   if (loading) return <div className="text-center mt-10">Loading...</div>;
   if (error) return <div className="text-red-500">{error}</div>;
 
@@ -120,7 +105,7 @@ const LibraryOccupancy = () => {
                 tickFormatter={(value) => `${value}%`}
                 tickLine={false}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip formatter={(value) => [`${value}%`, 'Occupancy']} />
               <Bar dataKey="occupancy" radius={[4, 4, 0, 0]}>
                 {occupancyData.map((entry) => (
                   <Cell
@@ -163,7 +148,7 @@ const LibraryOccupancy = () => {
                 tickFormatter={(value) => `${value}%`}
                 tickLine={false}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip formatter={(value) => [`${value}%`, 'Occupancy']} />
               <Bar dataKey="occupancy" radius={[4, 4, 0, 0]}>
                 {occupancyData.map((entry) => (
                   <Cell
