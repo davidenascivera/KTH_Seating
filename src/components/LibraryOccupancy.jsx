@@ -11,27 +11,43 @@ import {
 } from "recharts";
 import { database, ref, onValue } from './firebase';
 
-// Separate OccupancyCard into its own component outside the main component
-const OccupancyCard = React.memo(({ title, occupancy, data, onHover, onLeave, getBarColor, getColorFromOccupancy }) => (
+// Shared OccupancyCard component that adapts to screen size
+const OccupancyCard = React.memo(({ 
+  title, 
+  occupancy, 
+  data, 
+  onHover, 
+  onLeave, 
+  getBarColor, 
+  getColorFromOccupancy,
+  isMobile 
+}) => (
   <div
-    className="w-[300px] h-[150px] bg-white rounded-lg shadow-lg overflow-visible hover:shadow-xl transition-all duration-300"
+    className={`bg-white rounded-lg shadow-lg overflow-visible hover:shadow-xl transition-all duration-300 ${
+      isMobile ? 'w-full mb-4' : 'w-[300px] h-[150px]'
+    }`}
     onMouseEnter={onHover}
     onMouseLeave={onLeave}
   >
-    <div className="p-3 h-full flex flex-col justify-between">
-      <div className="flex justify-between items-center">
-        <h3 className="text-xl font-bold text-gray-700">{title}</h3>
+    <div className={`${isMobile ? 'p-4' : 'p-3'} h-full flex flex-col`}>
+      <div className="flex justify-between items-center mb-2">
+        <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold text-gray-700`}>
+          {title}
+        </h3>
         <div
-          className="text-2xl font-bold"
+          className={`${isMobile ? 'text-xl' : 'text-2xl'} font-bold`}
           style={{ color: getColorFromOccupancy(occupancy) }}
         >
           {occupancy}%
         </div>
       </div>
 
-      <div style={{ width: "100%", height: "200px", marginBottom: "-15px", marginLeft: "-10px" }}>
+      <div className={isMobile ? 'h-[150px] w-full' : 'w-full h-[200px] -mb-[15px] -ml-[10px]'}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ left: 10, right: 25, top: 10, bottom: 5 }}>
+          <BarChart 
+            data={data} 
+            margin={isMobile ? { left: 0, right: 10, top: 10, bottom: 5 } : { left: 10, right: 25, top: 10, bottom: 5 }}
+          >
             <XAxis
               dataKey="time"
               tick={{ fontSize: 10 }}
@@ -42,18 +58,11 @@ const OccupancyCard = React.memo(({ title, occupancy, data, onHover, onLeave, ge
               tick={{ fontSize: 10 }}
               tickFormatter={(value) => `${value}%`}
               tickLine={false}
-              width={35}
+              width={isMobile ? 30 : 35}
             />
             <Tooltip content={({ active, payload, label }) => (
               active && payload && payload.length ? (
-                <div
-                  className="bg-white shadow-lg rounded-lg p-2 border border-gray-200 absolute pointer-events-none"
-                  style={{
-                    transform: "translate(10px, 80px)",
-                    zIndex: 1000,
-                    minWidth: "160px"
-                  }}
-                >
+                <div className="bg-white shadow-lg rounded-lg p-2 border border-gray-200">
                   <p className="font-semibold text-gray-900 text-sm">Time: {label}</p>
                   <p
                     className="font-medium text-sm"
@@ -64,11 +73,7 @@ const OccupancyCard = React.memo(({ title, occupancy, data, onHover, onLeave, ge
                 </div>
               ) : null
             )} />
-            <Bar
-              dataKey="occupancy"
-              radius={[4, 4, 0, 0]}
-              isAnimationActive={false}
-            >
+            <Bar dataKey="occupancy" radius={[4, 4, 0, 0]} isAnimationActive={false}>
               {data.map((entry) => (
                 <Cell key={`cell-${entry.time}`} fill={getBarColor(entry.time)} />
               ))}
@@ -88,6 +93,7 @@ const LibraryOccupancy = () => {
   const [currentHour, setCurrentHour] = useState("");
   const [hoveredCard, setHoveredCard] = useState(null);
   const [weather, setWeather] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
   const [realTimeOccupancy, setRealTimeOccupancy] = useState({
     main: 0,
     southEast: 0,
@@ -97,8 +103,19 @@ const LibraryOccupancy = () => {
     newton: 0
   });
 
+  // Check for mobile screen size
   useEffect(() => {
-    // Firebase real-time listener
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768); // 768px is typical tablet/mobile breakpoint
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Existing useEffect for data fetching remains the same
+  useEffect(() => {
     const occupancyRef = ref(database, 'current-occupancy');
     const unsubscribe = onValue(occupancyRef, (snapshot) => {
       const data = snapshot.val();
@@ -121,7 +138,6 @@ const LibraryOccupancy = () => {
         );
         const text = await response.text();
         const rows = text.split("\n").slice(1);
-
         const parsedData = rows
           .filter((row) => row.trim() !== "")
           .map((row) => {
@@ -164,8 +180,6 @@ const LibraryOccupancy = () => {
 
     fetchData();
     fetchWeather();
-
-    // Cleanup Firebase listener
     return () => unsubscribe();
   }, []);
 
@@ -200,43 +214,87 @@ const LibraryOccupancy = () => {
 
   const chartData = useMemo(() => occupancyData, [occupancyData]);
 
-  const renderCards = useMemo(() => (
-    <div className="grid grid-cols-2 gap-2 auto-rows-max">
-      {[
-        { title: "KTH LIBRARY", key: "main", id: "first" },
-        { title: "South-East Gallery", key: "southEast", id: "second" },
-        { title: "North Gallery", key: "north", id: "third" },
-        { title: "South Gallery", key: "south", id: "fourth" },
-        { title: "Ångdomen", key: "angdomen", id: "fifth" },
-        { title: "Newton", key: "newton", id: "sixth" }
-      ].map(({ title, key, id }) => (
-        <OccupancyCard
-          key={id}
-          title={title}
-          occupancy={realTimeOccupancy[key]}
-          data={chartData}
-          onHover={() => setHoveredCard(id)}
-          onLeave={() => setHoveredCard(null)}
-          getBarColor={getBarColor}
-          getColorFromOccupancy={getColorFromOccupancy}
-        />
-      ))}
-    </div>
-  ), [realTimeOccupancy, chartData, currentHour]);
-
   const getImageSrc = () => {
-    if (hoveredCard === "first") return "/2.png";
-    if (hoveredCard === "second") return "/3.png";
-    if (hoveredCard === "third") return "/4.png";
-    if (hoveredCard === "fourth") return "/5.png";
-    if (hoveredCard === "fifth") return "/6.png";
-    if (hoveredCard === "sixth") return "/7.png";
+    if (!isMobile) {
+      if (hoveredCard === "first") return "/2.png";
+      if (hoveredCard === "second") return "/3.png";
+      if (hoveredCard === "third") return "/4.png";
+      if (hoveredCard === "fourth") return "/5.png";
+      if (hoveredCard === "fifth") return "/6.png";
+      if (hoveredCard === "sixth") return "/7.png";
+    }
     return "/1.png";
   };
 
   if (loading) return <div className="text-center mt-10">Loading...</div>;
   if (error) return <div className="text-red-500">{error}</div>;
 
+  // Mobile Layout
+  if (isMobile) {
+    return (
+      <div className="flex flex-col items-center min-h-screen bg-gray-100 p-4">
+        <h1 className="text-3xl font-bold text-gray-800 mb-4">
+          KTH Library Seat Prediction
+        </h1>
+        <p className="text-center text-gray-600 mb-4 px-4">
+          This project is a serverless application to predict the seating at the KTH library.
+        </p>
+
+        {/* Floor plan image */}
+        <div className="w-full max-w-md mb-6">
+          <img
+            src={getImageSrc()}
+            alt="Floor plan"
+            className="w-full h-auto rounded-lg shadow-lg"
+          />
+        </div>
+
+        {/* Weather and exam countdown */}
+        {weather && (
+          <div className="w-full max-w-md mb-6 flex flex-col gap-2">
+            <div className="flex items-center justify-center gap-4 p-4 bg-white rounded-lg shadow-md">
+              <div className="text-5xl">
+                {getWeatherIcon(weather.condition)}
+              </div>
+              <div className="text-gray-800">
+                <p className="text-xl font-semibold">{weather.temp_c}°C</p>
+                <p className="text-sm">{weather.condition?.text}</p>
+              </div>
+            </div>
+            <div className="p-4 bg-white rounded-lg shadow-md text-center">
+              <p className="text-lg font-bold text-gray-800">
+                Days until exams: <span className="text-blue-600">10</span>
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Occupancy cards */}
+        <div className="w-full max-w-md space-y-4">
+          {[
+            { title: "KTH LIBRARY", key: "main" },
+            { title: "South-East Gallery", key: "southEast" },
+            { title: "North Gallery", key: "north" },
+            { title: "South Gallery", key: "south" },
+            { title: "Ångdomen", key: "angdomen" },
+            { title: "Newton", key: "newton" }
+          ].map(({ title, key }) => (
+            <OccupancyCard
+              key={key}
+              title={title}
+              occupancy={realTimeOccupancy[key]}
+              data={chartData}
+              getBarColor={getBarColor}
+              getColorFromOccupancy={getColorFromOccupancy}
+              isMobile={true}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop Layout
   return (
     <div className="flex flex-col items-center min-h-screen bg-gray-100 p-4">
       <h1 className="text-4xl font-bold text-gray-800 mb-8">
@@ -248,7 +306,29 @@ const LibraryOccupancy = () => {
 
       <div className="bg-white rounded-xl shadow-2xl p-4 w-full max-w-[1200px]">
         <div className="flex flex-row items-center justify-center gap-6">
-          {renderCards}
+          {/* Desktop grid layout */}
+          <div className="grid grid-cols-2 gap-2 auto-rows-max">
+            {[
+              { title: "KTH LIBRARY", key: "main", id: "first" },
+              { title: "South-East Gallery", key: "southEast", id: "second" },
+              { title: "North Gallery", key: "north", id: "third" },
+              { title: "South Gallery", key: "south", id: "fourth" },
+              { title: "Ångdomen", key: "angdomen", id: "fifth" },
+              { title: "Newton", key: "newton", id: "sixth" }
+            ].map(({ title, key, id }) => (
+              <OccupancyCard
+                key={id}
+                title={title}
+                occupancy={realTimeOccupancy[key]}
+                data={chartData}
+                onHover={() => setHoveredCard(id)}
+                onLeave={() => setHoveredCard(null)}
+                getBarColor={getBarColor}
+                getColorFromOccupancy={getColorFromOccupancy}
+                isMobile={false}
+              />
+            ))}
+          </div>
 
           <div className="flex flex-col items-center w-[500px]">
             <img
