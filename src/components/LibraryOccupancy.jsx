@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { database, ref, onValue } from './firebase';
 
-// Shared OccupancyCard component that adapts to screen size
+// OccupancyCard componente riutilizzabile e responsivo
 const OccupancyCard = React.memo(({ 
   title, 
   occupancy, 
@@ -29,7 +29,7 @@ const OccupancyCard = React.memo(({
     onMouseEnter={onHover}
     onMouseLeave={onLeave}
   >
-    <div className={`${isMobile ? 'p-4' : 'p-3'} h-full flex flex-col`}>
+    <div className={`${isMobile ? 'p-4' : 'p-3'} h-full flex flex-col justify-between`}>
       <div className="flex justify-between items-center mb-2">
         <h3 className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold text-gray-700`}>
           {title}
@@ -42,11 +42,20 @@ const OccupancyCard = React.memo(({
         </div>
       </div>
 
-      <div className={isMobile ? 'h-[150px] w-full' : 'w-full h-[200px] -mb-[15px] -ml-[10px]'}>
+      {/* Wrapper del grafico */}
+      <div
+        className={isMobile 
+          ? 'h-[150px] w-full' 
+          : 'w-full h-[200px] -mb-[15px] -ml-[10px]'
+        }
+      >
         <ResponsiveContainer width="100%" height="100%">
           <BarChart 
             data={data} 
-            margin={isMobile ? { left: 0, right: 10, top: 10, bottom: 5 } : { left: 10, right: 25, top: 10, bottom: 5 }}
+            margin={isMobile 
+              ? { left: 0, right: 10, top: 10, bottom: 5 } 
+              : { left: 10, right: 25, top: 10, bottom: 5 }
+            }
           >
             <XAxis
               dataKey="time"
@@ -60,22 +69,41 @@ const OccupancyCard = React.memo(({
               tickLine={false}
               width={isMobile ? 30 : 35}
             />
-            <Tooltip content={({ active, payload, label }) => (
-              active && payload && payload.length ? (
-                <div className="bg-white shadow-lg rounded-lg p-2 border border-gray-200">
-                  <p className="font-semibold text-gray-900 text-sm">Time: {label}</p>
-                  <p
-                    className="font-medium text-sm"
-                    style={{ color: getColorFromOccupancy(payload[0].value) }}
+
+            {/* Tooltip con box overlay personalizzato */}
+            <Tooltip
+              content={({ active, payload, label }) => (
+                active && payload && payload.length ? (
+                  <div
+                    className="bg-white shadow-lg rounded-lg p-2 border border-gray-200 absolute pointer-events-none"
+                    style={{
+                      transform: "translate(10px, 80px)",
+                      zIndex: 1000,
+                      minWidth: "160px"
+                    }}
                   >
-                    Occupancy: {payload[0].value}%
-                  </p>
-                </div>
-              ) : null
-            )} />
-            <Bar dataKey="occupancy" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                    <p className="font-semibold text-gray-900 text-sm">Time: {label}</p>
+                    <p
+                      className="font-medium text-sm"
+                      style={{ color: getColorFromOccupancy(payload[0].value) }}
+                    >
+                      Occupancy: {payload[0].value}%
+                    </p>
+                  </div>
+                ) : null
+              )}
+            />
+
+            <Bar
+              dataKey="occupancy"
+              radius={[4, 4, 0, 0]}
+              isAnimationActive={false}
+            >
               {data.map((entry) => (
-                <Cell key={`cell-${entry.time}`} fill={getBarColor(entry.time)} />
+                <Cell 
+                  key={`cell-${entry.time}`} 
+                  fill={getBarColor(entry.time)} 
+                />
               ))}
             </Bar>
           </BarChart>
@@ -103,10 +131,10 @@ const LibraryOccupancy = () => {
     newton: 0
   });
 
-  // Check for mobile screen size
+  // Verifica se lo schermo è di dimensioni mobile
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768); // 768px is typical tablet/mobile breakpoint
+      setIsMobile(window.innerWidth < 768);
     };
 
     checkMobile();
@@ -114,8 +142,9 @@ const LibraryOccupancy = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Existing useEffect for data fetching remains the same
+  // Fetch dei dati dall'endpoint e da Firebase
   useEffect(() => {
+    // Listener su Firebase
     const occupancyRef = ref(database, 'current-occupancy');
     const unsubscribe = onValue(occupancyRef, (snapshot) => {
       const data = snapshot.val();
@@ -131,13 +160,15 @@ const LibraryOccupancy = () => {
       }
     });
 
+    // Lettura CSV con i dati di occupancy
     const fetchData = async () => {
       try {
         const response = await fetch(
           "https://huggingface.co/datasets/davnas/library-occupancy/raw/main/data.csv"
         );
         const text = await response.text();
-        const rows = text.split("\n").slice(1);
+        const rows = text.split("\n").slice(1);  // rimuove l'intestazione
+
         const parsedData = rows
           .filter((row) => row.trim() !== "")
           .map((row) => {
@@ -150,6 +181,7 @@ const LibraryOccupancy = () => {
 
         setOccupancyData(parsedData);
 
+        // Determina l'ora corrente in formato HH:00
         const now = new Date();
         const hour = now.getHours().toString().padStart(2, "0");
         const formattedHour = `${hour}:00`;
@@ -166,6 +198,7 @@ const LibraryOccupancy = () => {
       }
     };
 
+    // Fetch meteo
     const fetchWeather = async () => {
       try {
         const response = await fetch(
@@ -180,15 +213,18 @@ const LibraryOccupancy = () => {
 
     fetchData();
     fetchWeather();
+
     return () => unsubscribe();
   }, []);
 
+  // Funzione che restituisce il colore basato sul livello di occupancy
   const getColorFromOccupancy = (occupancy) => {
-    if (occupancy <= 50) return "#22c55e";
-    if (occupancy <= 80) return "#f97316";
-    return "#dc2626";
+    if (occupancy <= 50) return "#22c55e";   // verde
+    if (occupancy <= 80) return "#f97316";   // arancione
+    return "#dc2626";                       // rosso
   };
 
+  // Funzione che decide il colore della barra in base all'ora corrente
   const getBarColor = (time) => {
     const timeHour = parseInt(time.split(":")[0], 10);
     const currentTimeHour = parseInt(currentHour.split(":")[0], 10);
@@ -196,15 +232,19 @@ const LibraryOccupancy = () => {
     if (time === currentHour) {
       return getColorFromOccupancy(currentOccupancy);
     } else if (timeHour < currentTimeHour) {
+      // ore passate (azzurro)
       return "#93c5fd";
     } else {
+      // ore future (blu più chiaro)
       return "#bfdbfe";
     }
   };
 
+  // Seleziona l'icona meteo in base al codice condizione
   const getWeatherIcon = (condition) => {
     if (!condition) return <WiDaySunny className="text-yellow-500" />;
     const code = condition.code;
+
     if (code >= 1000 && code < 1003) return <WiDaySunny className="text-yellow-500" />;
     if (code >= 1003 && code < 1063) return <WiCloudy className="text-gray-500" />;
     if (code >= 1063 && code < 1200) return <WiRain className="text-blue-500" />;
@@ -212,8 +252,10 @@ const LibraryOccupancy = () => {
     return <WiDaySunny className="text-yellow-500" />;
   };
 
+  // Memorizziamo i dati del grafico
   const chartData = useMemo(() => occupancyData, [occupancyData]);
 
+  // Determina l'immagine da mostrare al passaggio del mouse (solo desktop)
   const getImageSrc = () => {
     if (!isMobile) {
       if (hoveredCard === "first") return "/2.png";
@@ -229,7 +271,7 @@ const LibraryOccupancy = () => {
   if (loading) return <div className="text-center mt-10">Loading...</div>;
   if (error) return <div className="text-red-500">{error}</div>;
 
-  // Mobile Layout
+  // LAYOUT MOBILE
   if (isMobile) {
     return (
       <div className="flex flex-col items-center min-h-screen bg-gray-100 p-4">
@@ -240,7 +282,7 @@ const LibraryOccupancy = () => {
           This project is a serverless application to predict the seating at the KTH library.
         </p>
 
-        {/* Floor plan image */}
+        {/* Immagine del piano */}
         <div className="w-full max-w-md mb-6">
           <img
             src={getImageSrc()}
@@ -249,7 +291,7 @@ const LibraryOccupancy = () => {
           />
         </div>
 
-        {/* Weather and exam countdown */}
+        {/* Sezione meteo e countdown esami */}
         {weather && (
           <div className="w-full max-w-md mb-6 flex flex-col gap-2">
             <div className="flex items-center justify-center gap-4 p-4 bg-white rounded-lg shadow-md">
@@ -269,7 +311,7 @@ const LibraryOccupancy = () => {
           </div>
         )}
 
-        {/* Occupancy cards */}
+        {/* Card occupancy in colonna per mobile */}
         <div className="w-full max-w-md space-y-4">
           {[
             { title: "KTH LIBRARY", key: "main" },
@@ -294,7 +336,7 @@ const LibraryOccupancy = () => {
     );
   }
 
-  // Desktop Layout
+  // LAYOUT DESKTOP
   return (
     <div className="flex flex-col items-center min-h-screen bg-gray-100 p-4">
       <h1 className="text-4xl font-bold text-gray-800 mb-8">
@@ -306,7 +348,7 @@ const LibraryOccupancy = () => {
 
       <div className="bg-white rounded-xl shadow-2xl p-4 w-full max-w-[1200px]">
         <div className="flex flex-row items-center justify-center gap-6">
-          {/* Desktop grid layout */}
+          {/* Griglia con 6 card */}
           <div className="grid grid-cols-2 gap-2 auto-rows-max">
             {[
               { title: "KTH LIBRARY", key: "main", id: "first" },
@@ -330,6 +372,7 @@ const LibraryOccupancy = () => {
             ))}
           </div>
 
+          {/* Sezione immagine, meteo e countdown esami */}
           <div className="flex flex-col items-center w-[500px]">
             <img
               src={getImageSrc()}
