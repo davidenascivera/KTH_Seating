@@ -164,32 +164,47 @@ const LibraryOccupancy = () => {
     const fetchData = async () => {
       try {
         const response = await fetch(
-          "https://huggingface.co/datasets/davnas/library-occupancy/raw/main/data.csv"
+          "https://huggingface.co/datasets/davnas/library-occupancy/raw/main/data_2.csv"
         );
         const text = await response.text();
-        const rows = text.split("\n").slice(1);  // rimuove l'intestazione
-
-        const parsedData = rows
-          .filter((row) => row.trim() !== "")
-          .map((row) => {
-            const [time, occupancy] = row.split(",");
+        const rows = text.split("\n");
+        const headers = rows[0].split(",");
+        
+        const parsedData = rows.slice(1)
+          .filter(row => row.trim() !== "")
+          .map(row => {
+            const values = row.split(",");
             return {
-              time: time.trim(),
-              occupancy: parseInt(occupancy.trim(), 10),
+              time: values[0].trim(),
+              main: parseInt(values[1], 10),
+              southEast: parseInt(values[2], 10),
+              north: parseInt(values[3], 10),
+              south: parseInt(values[4], 10),
+              angdomen: parseInt(values[5], 10),
+              newton: parseInt(values[6], 10)
             };
           });
 
         setOccupancyData(parsedData);
 
-        // Determina l'ora corrente in formato HH:00
+        // Update current occupancy for all areas
         const now = new Date();
         const hour = now.getHours().toString().padStart(2, "0");
-        const formattedHour = `${hour}:00`;
-        setCurrentHour(formattedHour);
+        const minute = Math.floor(now.getMinutes() / 30) * 30;
+        const formattedTime = `${hour}:${minute === 0 ? '00' : '30'}`;
+        setCurrentHour(formattedTime);
 
-        const currentData = parsedData.find((entry) => entry.time === formattedHour);
+        const currentData = parsedData.find(entry => entry.time === formattedTime);
         if (currentData) {
-          setCurrentOccupancy(currentData.occupancy);
+          setCurrentOccupancy(currentData.main); // For backward compatibility
+          setRealTimeOccupancy({
+            main: currentData.main,
+            southEast: currentData.southEast,
+            north: currentData.north,
+            south: currentData.south,
+            angdomen: currentData.angdomen,
+            newton: currentData.newton
+          });
         }
       } catch (err) {
         setError(`Error loading data: ${err.message}`);
@@ -271,6 +286,40 @@ const LibraryOccupancy = () => {
   if (loading) return <div className="text-center mt-10">Loading...</div>;
   if (error) return <div className="text-red-500">{error}</div>;
 
+  // Funzione per ottenere i dati di un'area specifica
+  const getAreaData = (areaKey) => {
+    return occupancyData.map(entry => ({
+      time: entry.time,
+      occupancy: entry[areaKey]
+    }));
+  };
+
+  // Funzione per rendere le card
+  const renderCards = (isMobile) => (
+    <div className={isMobile ? "w-full max-w-md space-y-4" : "grid grid-cols-2 gap-2 auto-rows-max"}>
+      {[
+        { title: "KTH LIBRARY", key: "main", id: "first" },
+        { title: "South-East Gallery", key: "southEast", id: "second" },
+        { title: "North Gallery", key: "north", id: "third" },
+        { title: "South Gallery", key: "south", id: "fourth" },
+        { title: "Ångdomen", key: "angdomen", id: "fifth" },
+        { title: "Newton", key: "newton", id: "sixth" }
+      ].map(({ title, key, id }) => (
+        <OccupancyCard
+          key={id}
+          title={title}
+          occupancy={realTimeOccupancy[key]}
+          data={getAreaData(key)}
+          onHover={() => !isMobile && setHoveredCard(id)}
+          onLeave={() => !isMobile && setHoveredCard(null)}
+          getBarColor={getBarColor}
+          getColorFromOccupancy={getColorFromOccupancy}
+          isMobile={isMobile}
+        />
+      ))}
+    </div>
+  );
+
   // LAYOUT MOBILE
   if (isMobile) {
     return (
@@ -312,26 +361,7 @@ const LibraryOccupancy = () => {
         )}
 
         {/* Card occupancy in colonna per mobile */}
-        <div className="w-full max-w-md space-y-4">
-          {[
-            { title: "KTH LIBRARY", key: "main" },
-            { title: "South-East Gallery", key: "southEast" },
-            { title: "North Gallery", key: "north" },
-            { title: "South Gallery", key: "south" },
-            { title: "Ångdomen", key: "angdomen" },
-            { title: "Newton", key: "newton" }
-          ].map(({ title, key }) => (
-            <OccupancyCard
-              key={key}
-              title={title}
-              occupancy={realTimeOccupancy[key]}
-              data={chartData}
-              getBarColor={getBarColor}
-              getColorFromOccupancy={getColorFromOccupancy}
-              isMobile={true}
-            />
-          ))}
-        </div>
+        {renderCards(true)}
       </div>
     );
   }
@@ -349,28 +379,7 @@ const LibraryOccupancy = () => {
       <div className="bg-white rounded-xl shadow-2xl p-4 w-full max-w-[1200px]">
         <div className="flex flex-row items-center justify-center gap-6">
           {/* Griglia con 6 card */}
-          <div className="grid grid-cols-2 gap-2 auto-rows-max">
-            {[
-              { title: "KTH LIBRARY", key: "main", id: "first" },
-              { title: "South-East Gallery", key: "southEast", id: "second" },
-              { title: "North Gallery", key: "north", id: "third" },
-              { title: "South Gallery", key: "south", id: "fourth" },
-              { title: "Ångdomen", key: "angdomen", id: "fifth" },
-              { title: "Newton", key: "newton", id: "sixth" }
-            ].map(({ title, key, id }) => (
-              <OccupancyCard
-                key={id}
-                title={title}
-                occupancy={realTimeOccupancy[key]}
-                data={chartData}
-                onHover={() => setHoveredCard(id)}
-                onLeave={() => setHoveredCard(null)}
-                getBarColor={getBarColor}
-                getColorFromOccupancy={getColorFromOccupancy}
-                isMobile={false}
-              />
-            ))}
-          </div>
+          {renderCards(false)}
 
           {/* Sezione immagine, meteo e countdown esami */}
           <div className="flex flex-col items-center w-[500px]">
