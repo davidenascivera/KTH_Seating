@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { WiDaySunny, WiCloudy, WiRain, WiSnow } from "react-icons/wi";
 import {
   BarChart,
@@ -9,6 +9,76 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
+import { database, ref, onValue } from './firebase';
+
+// Separate OccupancyCard into its own component outside the main component
+const OccupancyCard = React.memo(({ title, occupancy, data, onHover, onLeave, getBarColor, getColorFromOccupancy }) => (
+  <div
+    className="w-[300px] h-[150px] bg-white rounded-lg shadow-lg overflow-visible hover:shadow-xl transition-all duration-300"
+    onMouseEnter={onHover}
+    onMouseLeave={onLeave}
+  >
+    <div className="p-3 h-full flex flex-col justify-between">
+      <div className="flex justify-between items-center">
+        <h3 className="text-xl font-bold text-gray-700">{title}</h3>
+        <div
+          className="text-2xl font-bold"
+          style={{ color: getColorFromOccupancy(occupancy) }}
+        >
+          {occupancy}%
+        </div>
+      </div>
+
+      <div style={{ width: "100%", height: "200px", marginBottom: "-15px", marginLeft: "-10px" }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ left: 10, right: 25, top: 10, bottom: 5 }}>
+            <XAxis
+              dataKey="time"
+              tick={{ fontSize: 10 }}
+              interval="preserveStartEnd"
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fontSize: 10 }}
+              tickFormatter={(value) => `${value}%`}
+              tickLine={false}
+              width={35}
+            />
+            <Tooltip content={({ active, payload, label }) => (
+              active && payload && payload.length ? (
+                <div
+                  className="bg-white shadow-lg rounded-lg p-2 border border-gray-200 absolute pointer-events-none"
+                  style={{
+                    transform: "translate(10px, 80px)",
+                    zIndex: 1000,
+                    minWidth: "160px"
+                  }}
+                >
+                  <p className="font-semibold text-gray-900 text-sm">Time: {label}</p>
+                  <p
+                    className="font-medium text-sm"
+                    style={{ color: getColorFromOccupancy(payload[0].value) }}
+                  >
+                    Occupancy: {payload[0].value}%
+                  </p>
+                </div>
+              ) : null
+            )} />
+            <Bar
+              dataKey="occupancy"
+              radius={[4, 4, 0, 0]}
+              isAnimationActive={false}
+            >
+              {data.map((entry) => (
+                <Cell key={`cell-${entry.time}`} fill={getBarColor(entry.time)} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  </div>
+));
 
 const LibraryOccupancy = () => {
   const [occupancyData, setOccupancyData] = useState([]);
@@ -16,10 +86,34 @@ const LibraryOccupancy = () => {
   const [error, setError] = useState(null);
   const [currentOccupancy, setCurrentOccupancy] = useState(0);
   const [currentHour, setCurrentHour] = useState("");
-  const [hoveredCard, setHoveredCard] = useState(null); // Track hovered card
+  const [hoveredCard, setHoveredCard] = useState(null);
   const [weather, setWeather] = useState(null);
+  const [realTimeOccupancy, setRealTimeOccupancy] = useState({
+    main: 0,
+    southEast: 0,
+    north: 0,
+    south: 0,
+    angdomen: 0,
+    newton: 0
+  });
 
   useEffect(() => {
+    // Firebase real-time listener
+    const occupancyRef = ref(database, 'current-occupancy');
+    const unsubscribe = onValue(occupancyRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setRealTimeOccupancy({
+          main: data.main || 0,
+          southEast: data.southEast || 0,
+          north: data.north || 0,
+          south: data.south || 0,
+          angdomen: data.angdomen || 0,
+          newton: data.newton || 0
+        });
+      }
+    });
+
     const fetchData = async () => {
       try {
         const response = await fetch(
@@ -70,6 +164,9 @@ const LibraryOccupancy = () => {
 
     fetchData();
     fetchWeather();
+
+    // Cleanup Firebase listener
+    return () => unsubscribe();
   }, []);
 
   const getColorFromOccupancy = (occupancy) => {
@@ -85,9 +182,9 @@ const LibraryOccupancy = () => {
     if (time === currentHour) {
       return getColorFromOccupancy(currentOccupancy);
     } else if (timeHour < currentTimeHour) {
-      return "#93c5fd"; // Darker blue for past hours
+      return "#93c5fd";
     } else {
-      return "#bfdbfe"; // Lighter blue for future hours
+      return "#bfdbfe";
     }
   };
 
@@ -101,84 +198,31 @@ const LibraryOccupancy = () => {
     return <WiDaySunny className="text-yellow-500" />;
   };
 
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div
-          className="bg-white shadow-lg rounded-lg p-2 border border-gray-200 absolute pointer-events-none"
-          style={{
-            transform: "translate(10px, 80px)",
-            zIndex: 1000,
-            minWidth: "160px"
-          }}
-        >
-          <p className="font-semibold text-gray-900 text-sm">Time: {label}</p>
-          <p
-            className="font-medium text-sm"
-            style={{ color: getColorFromOccupancy(payload[0].value) }}
-          >
-            Occupancy: {payload[0].value}%
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
+  const chartData = useMemo(() => occupancyData, [occupancyData]);
 
-  const OccupancyCard = ({ title, occupancy, data, onHover }) => (
-    <div
-      className="w-[300px] h-[150px] bg-white rounded-lg shadow-lg overflow-visible hover:shadow-xl transition-all duration-300"
-      onMouseEnter={onHover}
-      onMouseLeave={() => setHoveredCard(null)}
-    >
-      <div className="p-3 h-full flex flex-col justify-between">
-        <div className="flex justify-between items-center">
-          <h3 className="text-xl font-bold text-gray-700">{title}</h3>
-          <div
-            className="text-2xl font-bold"
-            style={{ color: getColorFromOccupancy(occupancy) }}
-          >
-            {occupancy}%
-          </div>
-        </div>
-  
-        <div style={{ width: "100%", height: "200px", marginBottom: "-15px", marginLeft: "-10px" }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ left: 10, right: 25, top: 10, bottom: 5 }}>
-              <XAxis
-                dataKey="time"
-                tick={{ fontSize: 10 }}
-                interval="preserveStartEnd"
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10 }}
-                tickFormatter={(value) => `${value}%`}
-                tickLine={false}
-                width={35}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar
-                dataKey="occupancy"
-                radius={[4, 4, 0, 0]}
-                isAnimationActive={false}
-              >
-                {data.map((entry) => (
-                  <Cell key={`cell-${entry.time}`} fill={getBarColor(entry.time)} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+  const renderCards = useMemo(() => (
+    <div className="grid grid-cols-2 gap-2 auto-rows-max">
+      {[
+        { title: "KTH LIBRARY", key: "main", id: "first" },
+        { title: "South-East Gallery", key: "southEast", id: "second" },
+        { title: "North Gallery", key: "north", id: "third" },
+        { title: "South Gallery", key: "south", id: "fourth" },
+        { title: "Ångdomen", key: "angdomen", id: "fifth" },
+        { title: "Newton", key: "newton", id: "sixth" }
+      ].map(({ title, key, id }) => (
+        <OccupancyCard
+          key={id}
+          title={title}
+          occupancy={realTimeOccupancy[key]}
+          data={chartData}
+          onHover={() => setHoveredCard(id)}
+          onLeave={() => setHoveredCard(null)}
+          getBarColor={getBarColor}
+          getColorFromOccupancy={getColorFromOccupancy}
+        />
+      ))}
     </div>
-  );
-  
-  
-  
-
-  if (loading) return <div className="text-center mt-10">Loading...</div>;
-  if (error) return <div className="text-red-500">{error}</div>;
+  ), [realTimeOccupancy, chartData, currentHour]);
 
   const getImageSrc = () => {
     if (hoveredCard === "first") return "/2.png";
@@ -189,6 +233,9 @@ const LibraryOccupancy = () => {
     if (hoveredCard === "sixth") return "/7.png";
     return "/1.png";
   };
+
+  if (loading) return <div className="text-center mt-10">Loading...</div>;
+  if (error) return <div className="text-red-500">{error}</div>;
 
   return (
     <div className="flex flex-col items-center min-h-screen bg-gray-100 p-4">
@@ -201,47 +248,8 @@ const LibraryOccupancy = () => {
 
       <div className="bg-white rounded-xl shadow-2xl p-4 w-full max-w-[1200px]">
         <div className="flex flex-row items-center justify-center gap-6">
-          {/* Left Section: Cards Grid */}
-          <div className="grid grid-cols-2 gap-2 auto-rows-max">
-            <OccupancyCard
-              title="Newton 1"
-              occupancy={currentOccupancy}
-              data={occupancyData}
-              onHover={() => setHoveredCard("first")}
-            />
-            <OccupancyCard
-              title="Newton 2"
-              occupancy={Math.round(currentOccupancy * 0.9)}
-              data={occupancyData}
-              onHover={() => setHoveredCard("second")}
-            />
-            <OccupancyCard
-              title="Newton 3"
-              occupancy={Math.round(currentOccupancy * 0.8)}
-              data={occupancyData}
-              onHover={() => setHoveredCard("third")}
-            />
-            <OccupancyCard
-              title="Newton 4"
-              occupancy={Math.round(currentOccupancy * 0.7)}
-              data={occupancyData}
-              onHover={() => setHoveredCard("fourth")}
-            />
-            <OccupancyCard
-              title="Newton 5"
-              occupancy={Math.round(currentOccupancy * 0.6)}
-              data={occupancyData}
-              onHover={() => setHoveredCard("fifth")}
-            />
-            <OccupancyCard
-              title="Newton 6"
-              occupancy={Math.round(currentOccupancy * 0.5)}
-              data={occupancyData}
-              onHover={() => setHoveredCard("sixth")}
-            />
-          </div>
+          {renderCards}
 
-          {/* Right Section: Dynamic Image and Weather */}
           <div className="flex flex-col items-center w-[500px]">
             <img
               src={getImageSrc()}
@@ -250,7 +258,7 @@ const LibraryOccupancy = () => {
             />
             {weather && (
               <div className="flex items-center gap-4 mt-4 p-4 bg-white/50 backdrop-blur-sm rounded-lg">
-                <div className="text-7xl"> {/* Changed from text-5xl to text-7xl */}
+                <div className="text-7xl">
                   {getWeatherIcon(weather.condition)}
                 </div>
                 <div className="text-gray-800">
@@ -259,7 +267,6 @@ const LibraryOccupancy = () => {
                 </div>
               </div>
             )}
-            {/* Exam Countdown Widget */}
             <div className="mt-0 p-0 bg-white/50 backdrop-blur-sm rounded-lg w-full text-center">
               <p className="text-xl font-bold text-gray-800">
                 Days until exams: <span className="text-blue-600">10</span>
@@ -272,4 +279,4 @@ const LibraryOccupancy = () => {
   );
 };
 
-export default LibraryOccupancy;
+export default React.memo(LibraryOccupancy);
