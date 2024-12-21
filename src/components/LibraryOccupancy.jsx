@@ -166,18 +166,9 @@ const LibraryOccupancy = () => {
   };
 
   return (
-    <div className="flex flex-col items-center min-h-screen bg-gray-100 p-4">
-      {/* Top Section: Dynamic Image */}
-      <div className="w-full max-w-[400px] mb-6">
-        <img
-          src={getImageSrc()}
-          alt="Floor plan"
-          className="w-full h-auto object-cover rounded-lg shadow-lg"
-        />
-      </div>
-
-      {/* Grid Section: 3x2 Cards */}
-      <div className="grid grid-cols-3 gap-2">
+    <div className="flex flex-row items-start justify-center min-h-screen bg-gray-100 p-4 gap-6">
+      {/* Left Section: Cards Grid */}
+      <div className="grid grid-cols-2 gap-2 auto-rows-max">
         <OccupancyCard
           title="Newton 1"
           occupancy={currentOccupancy}
@@ -213,6 +204,15 @@ const LibraryOccupancy = () => {
           occupancy={Math.round(currentOccupancy * 0.5)}
           data={occupancyData}
           onHover={() => setHoveredCard("sixth")}
+        />
+      </div>
+
+      {/* Right Section: Dynamic Image */}
+      <div className="sticky top-4 w-[400px]">
+        <img
+          src={getImageSrc()}
+          alt="Floor plan"
+          className="w-full h-auto object-cover rounded-lg shadow-lg"
         />
       </div>
     </div>
