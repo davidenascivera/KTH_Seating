@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { WiDaySunny, WiCloudy, WiRain, WiSnow } from "react-icons/wi";
 import {
   BarChart,
   Bar,
@@ -16,6 +17,7 @@ const LibraryOccupancy = () => {
   const [currentOccupancy, setCurrentOccupancy] = useState(0);
   const [currentHour, setCurrentHour] = useState("");
   const [hoveredCard, setHoveredCard] = useState(null); // Track hovered card
+  const [weather, setWeather] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -54,7 +56,20 @@ const LibraryOccupancy = () => {
       }
     };
 
+    const fetchWeather = async () => {
+      try {
+        const response = await fetch(
+          "https://api.weatherapi.com/v1/current.json?key=9bb3873cd7fc42c8ac1190047241211&q=Stockholm&aqi=no"
+        );
+        const data = await response.json();
+        setWeather(data.current);
+      } catch (error) {
+        console.error("Error fetching weather:", error);
+      }
+    };
+
     fetchData();
+    fetchWeather();
   }, []);
 
   const getColorFromOccupancy = (occupancy) => {
@@ -74,6 +89,16 @@ const LibraryOccupancy = () => {
     } else {
       return "#bfdbfe"; // Lighter blue for future hours
     }
+  };
+
+  const getWeatherIcon = (condition) => {
+    if (!condition) return <WiDaySunny className="text-yellow-500" />;
+    const code = condition.code;
+    if (code >= 1000 && code < 1003) return <WiDaySunny className="text-yellow-500" />;
+    if (code >= 1003 && code < 1063) return <WiCloudy className="text-gray-500" />;
+    if (code >= 1063 && code < 1200) return <WiRain className="text-blue-500" />;
+    if (code >= 1200 && code < 1300) return <WiSnow className="text-blue-300" />;
+    return <WiDaySunny className="text-yellow-500" />;
   };
 
   const CustomTooltip = ({ active, payload, label }) => {
@@ -166,54 +191,82 @@ const LibraryOccupancy = () => {
   };
 
   return (
-    <div className="flex flex-row items-start justify-center min-h-screen bg-gray-100 p-4 gap-6">
-      {/* Left Section: Cards Grid */}
-      <div className="grid grid-cols-2 gap-2 auto-rows-max">
-        <OccupancyCard
-          title="Newton 1"
-          occupancy={currentOccupancy}
-          data={occupancyData}
-          onHover={() => setHoveredCard("first")}
-        />
-        <OccupancyCard
-          title="Newton 2"
-          occupancy={Math.round(currentOccupancy * 0.9)}
-          data={occupancyData}
-          onHover={() => setHoveredCard("second")}
-        />
-        <OccupancyCard
-          title="Newton 3"
-          occupancy={Math.round(currentOccupancy * 0.8)}
-          data={occupancyData}
-          onHover={() => setHoveredCard("third")}
-        />
-        <OccupancyCard
-          title="Newton 4"
-          occupancy={Math.round(currentOccupancy * 0.7)}
-          data={occupancyData}
-          onHover={() => setHoveredCard("fourth")}
-        />
-        <OccupancyCard
-          title="Newton 5"
-          occupancy={Math.round(currentOccupancy * 0.6)}
-          data={occupancyData}
-          onHover={() => setHoveredCard("fifth")}
-        />
-        <OccupancyCard
-          title="Newton 6"
-          occupancy={Math.round(currentOccupancy * 0.5)}
-          data={occupancyData}
-          onHover={() => setHoveredCard("sixth")}
-        />
-      </div>
+    <div className="flex flex-col items-center min-h-screen bg-gray-100 p-4">
+      <h1 className="text-4xl font-bold text-gray-800 mb-8">
+        KTH Library Seat Prediction
+      </h1>
+      <p className="text-center text-gray-600 mb-4">
+        This project is a serverless application to predict the seating at the KTH library.
+      </p>
 
-      {/* Right Section: Dynamic Image */}
-      <div className="sticky top-4 w-[400px]">
-        <img
-          src={getImageSrc()}
-          alt="Floor plan"
-          className="w-full h-auto object-cover rounded-lg shadow-lg"
-        />
+      <div className="bg-white rounded-xl shadow-2xl p-4 w-full max-w-[1200px]">
+        <div className="flex flex-row items-center justify-center gap-6">
+          {/* Left Section: Cards Grid */}
+          <div className="grid grid-cols-2 gap-2 auto-rows-max">
+            <OccupancyCard
+              title="Newton 1"
+              occupancy={currentOccupancy}
+              data={occupancyData}
+              onHover={() => setHoveredCard("first")}
+            />
+            <OccupancyCard
+              title="Newton 2"
+              occupancy={Math.round(currentOccupancy * 0.9)}
+              data={occupancyData}
+              onHover={() => setHoveredCard("second")}
+            />
+            <OccupancyCard
+              title="Newton 3"
+              occupancy={Math.round(currentOccupancy * 0.8)}
+              data={occupancyData}
+              onHover={() => setHoveredCard("third")}
+            />
+            <OccupancyCard
+              title="Newton 4"
+              occupancy={Math.round(currentOccupancy * 0.7)}
+              data={occupancyData}
+              onHover={() => setHoveredCard("fourth")}
+            />
+            <OccupancyCard
+              title="Newton 5"
+              occupancy={Math.round(currentOccupancy * 0.6)}
+              data={occupancyData}
+              onHover={() => setHoveredCard("fifth")}
+            />
+            <OccupancyCard
+              title="Newton 6"
+              occupancy={Math.round(currentOccupancy * 0.5)}
+              data={occupancyData}
+              onHover={() => setHoveredCard("sixth")}
+            />
+          </div>
+
+          {/* Right Section: Dynamic Image and Weather */}
+          <div className="flex flex-col items-center w-[500px]">
+            <img
+              src={getImageSrc()}
+              alt="Floor plan"
+              className="w-full h-auto object-cover rounded-lg"
+            />
+            {weather && (
+              <div className="flex items-center gap-4 mt-4 p-4 bg-white/50 backdrop-blur-sm rounded-lg">
+                <div className="text-7xl"> {/* Changed from text-5xl to text-7xl */}
+                  {getWeatherIcon(weather.condition)}
+                </div>
+                <div className="text-gray-800">
+                  <p className="text-2xl font-semibold">{weather.temp_c}°C</p>
+                  <p className="text-sm">{weather.condition?.text}</p>
+                </div>
+              </div>
+            )}
+            {/* Exam Countdown Widget */}
+            <div className="mt-0 p-0 bg-white/50 backdrop-blur-sm rounded-lg w-full text-center">
+              <p className="text-xl font-bold text-gray-800">
+                Days until exams: <span className="text-blue-600">10</span>
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
