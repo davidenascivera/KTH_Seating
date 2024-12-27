@@ -30,8 +30,7 @@ const OccupancyCard = React.memo(
     onLeave,
     getBarColor,
     getColorFromOccupancy,
-    isMobile,
-    commitTimeProp // <-- New prop for showing commit time
+    isMobile
   }) => (
     <div
       className={`bg-white rounded-lg shadow-lg overflow-visible hover:shadow-xl transition-all duration-300 relative ${
@@ -119,12 +118,6 @@ const OccupancyCard = React.memo(
           </ResponsiveContainer>
         </div>
       </div>
-      {/* Show commit date only if the prop is provided (i.e. for the first card) */}
-      {commitTimeProp && (
-        <div className="absolute bottom-1 left-2 text-xs text-gray-500">
-          Commit: {commitTimeProp}
-        </div>
-      )}
     </div>
   )
 );
@@ -906,8 +899,6 @@ const LibraryOccupancy = () => {
           getBarColor={getBarColor}
           getColorFromOccupancy={getColorFromOccupancy}
           isMobile={isMobile}
-          // Pass commitTime only to the FIRST card
-          commitTimeProp={id === "first" ? commitTime : null}
         />
       ))}
     </div>
@@ -964,10 +955,15 @@ const LibraryOccupancy = () => {
                 <p className="text-sm">{weather.condition?.text}</p>
               </div>
             </div>
-            <div className="p-4 bg-white rounded-lg shadow-md text-center">
+            <div className="p-4 bg-white rounded-lg shadow-md text-center flex flex-col gap-1">
               <p className="text-lg font-bold text-gray-800">
                 Days until exams: <span className="text-blue-600">10</span>
               </p>
+              {commitTime && (
+                <p className="text-xs text-gray-400">
+                  Last updated: {commitTime}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -1020,10 +1016,15 @@ const LibraryOccupancy = () => {
                 </div>
               </div>
             )}
-            <div className="mt-0 p-0 bg-white/50 backdrop-blur-sm rounded-lg w-full text-center">
+            <div className="mt-0 p-4 bg-white/50 backdrop-blur-sm rounded-lg w-full text-center flex flex-col gap-1">
               <p className="text-xl font-bold text-gray-800">
                 Days until exams: <span className="text-blue-600">10</span>
               </p>
+              {commitTime && (
+                <p className="text-xs text-gray-400">
+                  Last updated: {commitTime}
+                </p>
+              )}
             </div>
           </div>
         </div>
