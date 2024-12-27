@@ -16,15 +16,10 @@ import {
   Cell
 } from "recharts";
 
-/**
- * If you're using Firebase (as your code suggests), make sure you have
- * a proper firebase.js that exports { database, ref, onValue } 
- * or comment out the Firebase parts if not needed.
- */
 import { database, ref, onValue } from "./firebase";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1) OccupancyCard 
+// 1) OccupancyCard
 // ─────────────────────────────────────────────────────────────────────────────
 const OccupancyCard = React.memo(
   ({
@@ -35,10 +30,11 @@ const OccupancyCard = React.memo(
     onLeave,
     getBarColor,
     getColorFromOccupancy,
-    isMobile
+    isMobile,
+    commitTimeProp // <-- New prop for showing commit time
   }) => (
     <div
-      className={`bg-white rounded-lg shadow-lg overflow-visible hover:shadow-xl transition-all duration-300 ${
+      className={`bg-white rounded-lg shadow-lg overflow-visible hover:shadow-xl transition-all duration-300 relative ${
         isMobile ? "w-full mb-4" : "w-[300px] h-[150px]"
       }`}
       onMouseEnter={onHover}
@@ -57,7 +53,7 @@ const OccupancyCard = React.memo(
           </div>
         </div>
 
-        {/* Wrapper del grafico */}
+        {/* Wrapper for the bar chart */}
         <div
           className={
             isMobile
@@ -86,7 +82,6 @@ const OccupancyCard = React.memo(
                 tickLine={false}
                 width={isMobile ? 30 : 35}
               />
-              {/* Tooltip con box overlay personalizzato */}
               <Tooltip
                 content={({ active, payload, label }) =>
                   active && payload && payload.length ? (
@@ -124,15 +119,20 @@ const OccupancyCard = React.memo(
           </ResponsiveContainer>
         </div>
       </div>
+      {/* Show commit date only if the prop is provided (i.e. for the first card) */}
+      {commitTimeProp && (
+        <div className="absolute bottom-1 left-2 text-xs text-gray-500">
+          Commit: {commitTimeProp}
+        </div>
+      )}
     </div>
   )
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2) OccupancyComparison (updated to show Real vs Predicted from new CSV)
+// 2) OccupancyComparison (Real vs Predicted)
 // ─────────────────────────────────────────────────────────────────────────────
 const OccupancyComparison = ({ isMobile }) => {
-  // Set 'main' to true to make it the default visible graph
   const [visibleLines, setVisibleLines] = useState({
     main: true,
     southEast: false,
@@ -146,16 +146,16 @@ const OccupancyComparison = ({ isMobile }) => {
   const [parsedData, setParsedData] = useState([]);
   const [rmeData, setRmeData] = useState({});
   const [mapeData, setMapeData] = useState({});
+  const [parsedDate, setParsedDate] = useState(null);
+  const [error, setError] = useState(null);
 
-  // Colors for each area (real vs predicted).
-  // If you want different colors for "real" and "predicted," define them separately here.
   const colors = {
     // MAIN
     Occupancy_main_real: "#8884d8",
-    Occupancy_main_predicted: "#8884d8", // dashed
+    Occupancy_main_predicted: "#8884d8",
     // SOUTH-EAST
     Occupancy_southEast_real: "#82ca9d",
-    Occupancy_southEast_predicted: "#82ca9d", // dashed
+    Occupancy_southEast_predicted: "#82ca9d",
     // NORTH
     Occupancy_north_real: "#ffc658",
     Occupancy_north_predicted: "#ffc658",
@@ -170,7 +170,6 @@ const OccupancyComparison = ({ isMobile }) => {
     Occupancy_newton_predicted: "#00bcd4"
   };
 
-  // Button label => which set of lines to toggle
   const labelMap = [
     { key: "main", label: "Main" },
     { key: "southEast", label: "SouthEast" },
@@ -180,7 +179,6 @@ const OccupancyComparison = ({ isMobile }) => {
     { key: "newton", label: "Newton" }
   ];
 
-  // Fetch the Real-vs-Predicted CSV from Hugging Face
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -190,39 +188,47 @@ const OccupancyComparison = ({ isMobile }) => {
         const csvText = await response.text();
         const rows = csvText.split("\n").filter((r) => r.trim() !== "");
 
-        // The first row is the header
-        const header = rows[0].split(",").map(h => h.trim());
+        if (rows.length === 0) {
+          throw new Error("CSV is empty");
+        }
 
-        // Identify the indices for RME and MAPE
-        const rmeIndex = rows.findIndex(row => row.startsWith("RME"));
-        const mapeIndex = rows.findIndex(row => row.startsWith("MAPE"));
+        const header = rows[0].split(",").map((h) => h.trim());
+        const rmeIndex = rows.findIndex((row) => row.split(",")[1] === "RME");
+        const mapeIndex = rows.findIndex((row) => row.split(",")[1] === "MAPE");
 
-        // Parse time-series data (exclude RME and MAPE)
+        if (rmeIndex === -1 || mapeIndex === -1) {
+          throw new Error("RME or MAPE rows not found in CSV");
+        }
+
+        // Exclude RME and MAPE rows
         const timeSeriesRows = rows.slice(1, Math.min(rmeIndex, mapeIndex));
         const timeSeriesData = timeSeriesRows.map((row) => {
           const cols = row.split(",");
           const obj = {};
           header.forEach((colName, idx) => {
-            // Try converting to number if possible
             obj[colName] = isNaN(cols[idx]) ? cols[idx] : Number(cols[idx]);
           });
           return obj;
         });
 
-        // Parse RME data
+        // Extract a date from the first row
+        const firstDateEntry = timeSeriesRows[0]?.split(",")[0]?.trim();
+        setParsedDate(firstDateEntry || "unknown date");
+
+        // Parse RME
         const rmeRow = rows[rmeIndex].split(",");
         const rmeObj = {};
         header.forEach((colName, idx) => {
-          if (colName !== "Time") { // Exclude the 'Time' column
+          if (colName !== "Date" && colName !== "Time") {
             rmeObj[colName] = isNaN(rmeRow[idx]) ? rmeRow[idx] : Number(rmeRow[idx]);
           }
         });
 
-        // Parse MAPE data
+        // Parse MAPE
         const mapeRow = rows[mapeIndex].split(",");
         const mapeObj = {};
         header.forEach((colName, idx) => {
-          if (colName !== "Time") { // Exclude the 'Time' column
+          if (colName !== "Date" && colName !== "Time") {
             mapeObj[colName] = isNaN(mapeRow[idx]) ? mapeRow[idx] : Number(mapeRow[idx]);
           }
         });
@@ -232,14 +238,15 @@ const OccupancyComparison = ({ isMobile }) => {
         setMapeData(mapeObj);
       } catch (error) {
         console.error("Error fetching Real-vs-Predicted CSV:", error);
+        setError("Failed to load occupancy comparison data.");
       }
     };
     fetchData();
   }, []);
 
-  // A single toggle that flips both real & predicted lines for an area
   const toggleLine = (areaKey) => {
     setVisibleLines((prev) => {
+      // Switch off other lines, toggle only the clicked one
       const newState = Object.keys(prev).reduce((acc, key) => {
         acc[key] = key === areaKey ? !prev[key] : false;
         return acc;
@@ -248,13 +255,21 @@ const OccupancyComparison = ({ isMobile }) => {
     });
   };
 
-  // Determine the currently visible area
-  const currentVisibleAreaKey = Object.keys(visibleLines).find(key => visibleLines[key]) || "main";
+  const currentVisibleAreaKey =
+    Object.keys(visibleLines).find((key) => visibleLines[key]) || "main";
   const currentArea = labelMap.find(({ key }) => key === currentVisibleAreaKey);
   const currentAreaLabel = currentArea ? currentArea.label : "Main";
 
+  if (error) {
+    return (
+      <div className="bg-red-100 text-red-500 p-4 rounded-md mt-4">
+        <p>{error}</p>
+      </div>
+    );
+  }
+
   if (isMobile) {
-    // List of all areas to iterate over
+    // Render each area chart sequentially in mobile
     const areas = [
       { key: "main", label: "Main" },
       { key: "southEast", label: "SouthEast" },
@@ -266,22 +281,25 @@ const OccupancyComparison = ({ isMobile }) => {
 
     return (
       <div className="mt-8 w-full max-w-4xl">
-        {/* Simple heading without toggle */}
         <h2 className="text-2xl font-bold text-gray-800 mb-2">Occupancy Comparison</h2>
         <p className="text-gray-700 mb-4">
           Real vs Predicted Occupancy for Each Area
         </p>
 
-        {/* Render each area's graph sequentially */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-4">
+          <p className="mb-2">
+            This is the prediction made yesterday ({parsedDate}) versus the real occupancy
+            we had yesterday.
+          </p>
+        </div>
+
         {areas.map((area, index) => (
           <div key={area.key} className="mb-8">
-            {/* Title and Index */}
             <div className="flex items-center mb-2">
               <span className="text-lg font-semibold mr-2">{index + 1}.</span>
               <h3 className="text-lg font-bold text-gray-700">{area.label}</h3>
             </div>
 
-            {/* Line Chart for the specific area */}
             <div className="bg-white rounded-lg shadow-md p-4">
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={parsedData}>
@@ -295,11 +313,17 @@ const OccupancyComparison = ({ isMobile }) => {
                       fontSize: 12
                     }}
                   />
-                  <YAxis domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
+                  <YAxis
+                    domain={[0, 100]}
+                    tickFormatter={(value) => `${value}%`}
+                  />
                   <Tooltip />
-                  <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: "20px" }} />
+                  <Legend
+                    verticalAlign="top"
+                    align="right"
+                    wrapperStyle={{ paddingBottom: "20px" }}
+                  />
 
-                  {/* Real Line */}
                   <Line
                     type="monotone"
                     dataKey={`Occupancy_${area.key}_real`}
@@ -309,7 +333,6 @@ const OccupancyComparison = ({ isMobile }) => {
                     dot={false}
                     activeDot={{ r: 4 }}
                   />
-                  {/* Predicted Line */}
                   <Line
                     type="monotone"
                     dataKey={`Occupancy_${area.key}_predicted`}
@@ -323,15 +346,18 @@ const OccupancyComparison = ({ isMobile }) => {
                 </LineChart>
               </ResponsiveContainer>
 
-              {/* MAPE/RME Information */}
               <div className="mt-2 text-sm text-gray-600">
                 <p>
                   <span className="font-semibold">MAPE:</span>{" "}
-                  {mapeData[`Occupancy_${area.key}_predicted`] ? `${mapeData[`Occupancy_${area.key}_predicted`].toFixed(2)}%` : "N/A"}
+                  {mapeData[`Occupancy_${area.key}_predicted`]
+                    ? `${mapeData[`Occupancy_${area.key}_predicted`].toFixed(2)}%`
+                    : "N/A"}
                 </p>
                 <p>
                   <span className="font-semibold">RME:</span>{" "}
-                  {rmeData[`Occupancy_${area.key}_predicted`] ? `${rmeData[`Occupancy_${area.key}_predicted`].toFixed(2)}%` : "N/A"}
+                  {rmeData[`Occupancy_${area.key}_predicted`]
+                    ? `${rmeData[`Occupancy_${area.key}_predicted`].toFixed(2)}%`
+                    : "N/A"}
                 </p>
               </div>
             </div>
@@ -341,6 +367,7 @@ const OccupancyComparison = ({ isMobile }) => {
     );
   }
 
+  // Desktop layout for the comparison
   return (
     <div className="mt-8 w-full max-w-4xl">
       <button
@@ -370,20 +397,30 @@ const OccupancyComparison = ({ isMobile }) => {
         <div className="bg-white rounded-lg shadow-md p-4">
           <div className="mb-4 text-gray-700">
             <p className="mb-2">
-              This is the prediction made yesterday versus the real occupancy we had yesterday.
+              This is the prediction made yesterday ({parsedDate}) versus the real occupancy
+              we had yesterday.
             </p>
-            {/* Dynamic RME and MAPE Display for the Active Area */}
             <div className="flex flex-wrap gap-4 text-sm">
               <div className="font-semibold">
                 {currentAreaLabel}:
-                <span className="text-blue-600"> RME: {rmeData[`Occupancy_${currentVisibleAreaKey}_predicted`] ? `${rmeData[`Occupancy_${currentVisibleAreaKey}_predicted`].toFixed(2)}%` : "N/A"}</span>
-                <span className="text-blue-600 ml-2">MAPE: {mapeData[`Occupancy_${currentVisibleAreaKey}_predicted`] ? `${mapeData[`Occupancy_${currentVisibleAreaKey}_predicted`].toFixed(2)}%` : "N/A"}</span>
+                <span className="text-blue-600">
+                  {" "}
+                  RME:{" "}
+                  {rmeData[`Occupancy_${currentVisibleAreaKey}_predicted`]
+                    ? `${rmeData[`Occupancy_${currentVisibleAreaKey}_predicted`].toFixed(2)}%`
+                    : "N/A"}
+                </span>
+                <span className="text-blue-600 ml-2">
+                  MAPE:{" "}
+                  {mapeData[`Occupancy_${currentVisibleAreaKey}_predicted`]
+                    ? `${mapeData[`Occupancy_${currentVisibleAreaKey}_predicted`].toFixed(2)}%`
+                    : "N/A"}
+                </span>
               </div>
             </div>
           </div>
 
           <div className="flex flex-col md:flex-row gap-4">
-            {/* Toggle Buttons (to hide/show real & predicted lines per area) */}
             <div className="flex flex-wrap md:flex-col gap-2 w-full md:w-32">
               {labelMap.map(({ key, label }) => (
                 <button
@@ -393,7 +430,6 @@ const OccupancyComparison = ({ isMobile }) => {
                     visibleLines[key] ? "opacity-100" : "opacity-40"
                   }`}
                   style={{
-                    // We'll just pick the real color for the button.
                     backgroundColor: colors[`Occupancy_${key}_real`] || "#8884d8"
                   }}
                 >
@@ -402,7 +438,6 @@ const OccupancyComparison = ({ isMobile }) => {
               ))}
             </div>
 
-            {/* Chart Container */}
             <div className="flex-1 h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={parsedData} margin={{ top: 10, right: 30, left: 10, bottom: 40 }}>
@@ -601,6 +636,9 @@ const LibraryOccupancy = () => {
   });
   const [isFirebaseInitialized, setIsFirebaseInitialized] = useState(false);
 
+  // NEW: We'll store the commitTime from the first row of the CSV
+  const [commitTime, setCommitTime] = useState(null);
+
   // Check if screen is mobile
   useEffect(() => {
     const checkMobile = () => {
@@ -619,55 +657,53 @@ const LibraryOccupancy = () => {
     };
   }, []);
 
-  // Separate Firebase initialization
+  // Initialize Firebase and set up real-time occupancy
   useEffect(() => {
     let unsubscribe = null;
     let retryCount = 0;
     const MAX_RETRIES = 3;
 
-    // Load cached values from localStorage
-    const cachedValues = localStorage.getItem('libraryOccupancy');
+    const cachedValues = localStorage.getItem("libraryOccupancy");
     if (cachedValues) {
       try {
         const parsed = JSON.parse(cachedValues);
         setRealTimeOccupancy(parsed);
       } catch (e) {
-        console.error('Error parsing cached values:', e);
+        console.error("Error parsing cached values:", e);
       }
     }
 
     const initFirebase = async () => {
       try {
         const occupancyRef = ref(database, "current-occupancy");
-        
-        // Cleanup previous listener if it exists
         if (unsubscribe) {
           unsubscribe();
         }
 
-        unsubscribe = onValue(occupancyRef, (snapshot) => {
-          const data = snapshot.val();
-          if (data) {
-            const newValues = {
-              main: data.main || 0,
-              southEast: data.southEast || 0,
-              north: data.north || 0,
-              south: data.south || 0,
-              angdomen: data.angdomen || 0,
-              newton: data.newton || 0
-            };
-            
-            // Update state
-            setRealTimeOccupancy(newValues);
-            setIsFirebaseInitialized(true);
-            
-            // Cache values in localStorage
-            localStorage.setItem('libraryOccupancy', JSON.stringify(newValues));
+        unsubscribe = onValue(
+          occupancyRef,
+          (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+              const newValues = {
+                main: data.main || 0,
+                southEast: data.southEast || 0,
+                north: data.north || 0,
+                south: data.south || 0,
+                angdomen: data.angdomen || 0,
+                newton: data.newton || 0
+              };
+
+              setRealTimeOccupancy(newValues);
+              setIsFirebaseInitialized(true);
+              localStorage.setItem("libraryOccupancy", JSON.stringify(newValues));
+            }
+          },
+          (error) => {
+            console.error("Firebase error:", error);
+            retryConnection();
           }
-        }, (error) => {
-          console.error("Firebase error:", error);
-          retryConnection();
-        });
+        );
       } catch (error) {
         console.error("Firebase initialization error:", error);
         retryConnection();
@@ -678,24 +714,22 @@ const LibraryOccupancy = () => {
       if (retryCount < MAX_RETRIES) {
         retryCount++;
         console.log(`Retrying Firebase connection (${retryCount}/${MAX_RETRIES})...`);
-        setTimeout(initFirebase, 2000 * retryCount); // Exponential backoff
+        setTimeout(initFirebase, 2000 * retryCount);
       } else {
         setError("Unable to establish real-time connection. Using cached data.");
       }
     };
 
-    // Initialize Firebase
     initFirebase();
 
-    // Cleanup function
     return () => {
       if (unsubscribe) {
         unsubscribe();
       }
     };
-  }, []); // Empty dependency array - only run once
+  }, []);
 
-  // Separate effect for CSV and Weather data
+  // Fetch CSV + Weather
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -705,34 +739,42 @@ const LibraryOccupancy = () => {
         const text = await response.text();
         const rows = text.split("\n");
 
-        const parsedData = rows
+        // Parse the new CSV structure:
+        // commitTime, time, main, southEast, north, south, angdomen, newton
+        const parsed = rows
           .slice(1)
           .filter((row) => row.trim() !== "")
           .map((row) => {
             const values = row.split(",");
             return {
-              time: values[0].trim(),
-              main: parseInt(values[1], 10),
-              southEast: parseInt(values[2], 10),
-              north: parseInt(values[3], 10),
-              south: parseInt(values[4], 10),
-              angdomen: parseInt(values[5], 10),
-              newton: parseInt(values[6], 10)
+              commitTime: values[0].trim(),
+              time: values[1].trim(),
+              main: parseInt(values[2], 10),
+              southEast: parseInt(values[3], 10),
+              north: parseInt(values[4], 10),
+              south: parseInt(values[5], 10),
+              angdomen: parseInt(values[6], 10),
+              newton: parseInt(values[7], 10)
             };
           });
 
-        setOccupancyData(parsedData);
+        setOccupancyData(parsed);
 
-        // Update current occupancy for all areas
+        // Set the commitTime from the first (or last) row — here we use the first row
+        if (parsed.length > 0) {
+          setCommitTime(parsed[0].commitTime);
+        }
+
+        // Update current occupancy based on time-of-day
         const now = new Date();
         const hour = now.getHours().toString().padStart(2, "0");
         const minute = Math.floor(now.getMinutes() / 30) * 30;
         const formattedTime = `${hour}:${minute === 0 ? "00" : "30"}`;
         setCurrentHour(formattedTime);
 
-        const currentData = parsedData.find((entry) => entry.time === formattedTime);
+        const currentData = parsed.find((entry) => entry.time === formattedTime);
         if (currentData) {
-          // Uncomment the following lines if you want to set occupancy based on CSV data
+          // Optionally override realTimeOccupancy with CSV data if desired
           // setCurrentOccupancy(currentData.main);
           // setRealTimeOccupancy({
           //   main: currentData.main,
@@ -762,14 +804,13 @@ const LibraryOccupancy = () => {
       }
     };
 
-    Promise.all([fetchData(), fetchWeather()]).catch(error => {
+    Promise.all([fetchData(), fetchWeather()]).catch((error) => {
       console.error("Error fetching data:", error);
       setError("Error loading data. Please try again.");
       setLoading(false);
     });
-  }, []); // Empty dependency array - only run once
+  }, []);
 
-  // Show loading until both Firebase and data are ready
   if (loading || !isFirebaseInitialized) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -787,8 +828,8 @@ const LibraryOccupancy = () => {
         <div className="text-red-500 bg-red-100 p-4 rounded-lg">
           <h3 className="font-bold mb-2">Error</h3>
           <p>{error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
+          <button
+            onClick={() => window.location.reload()}
             className="mt-4 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
           >
             Retry
@@ -798,14 +839,12 @@ const LibraryOccupancy = () => {
     );
   }
 
-  // Returns a color based on occupancy
   const getColorFromOccupancy = (occupancy) => {
-    if (occupancy <= 50) return "#22c55e"; // verde
-    if (occupancy <= 80) return "#f97316"; // arancione
-    return "#dc2626"; // rosso
+    if (occupancy <= 50) return "#22c55e"; // green
+    if (occupancy <= 80) return "#f97316"; // orange
+    return "#dc2626"; // red
   };
 
-  // Bar color based on time vs current time
   const getBarColor = (time) => {
     const timeHour = parseInt(time.split(":")[0], 10);
     const currentTimeHour = parseInt(currentHour.split(":")[0], 10);
@@ -813,19 +852,18 @@ const LibraryOccupancy = () => {
     if (time === currentHour) {
       return getColorFromOccupancy(currentOccupancy);
     } else if (timeHour < currentTimeHour) {
-      // ore passate (azzurro)
+      // Past hours (light blue)
       return "#93c5fd";
     } else {
-      // ore future (blu più chiaro)
+      // Future hours (lighter blue)
       return "#bfdbfe";
     }
   };
 
-  // Weather icon helper
+  // Weather icon
   const getWeatherIcon = (condition) => {
     if (!condition) return <WiDaySunny className="text-yellow-500" />;
     const code = condition.code;
-
     if (code === 1000) return <WiDaySunny className="text-yellow-500" />;
     if (code === 1003) return <WiCloudy className="text-gray-500" />;
     if (code >= 1063 && code < 1200) return <WiRain className="text-blue-500" />;
@@ -833,7 +871,7 @@ const LibraryOccupancy = () => {
     return <WiDaySunny className="text-yellow-500" />;
   };
 
-  // Returns the occupancy data for a specific area
+  // Prepare data for bar chart
   const getAreaData = (areaKey) => {
     return occupancyData.map((entry) => ({
       time: entry.time,
@@ -841,7 +879,7 @@ const LibraryOccupancy = () => {
     }));
   };
 
-  // Renders the 6 occupancy cards
+  // Render 6 cards
   const renderCards = (isMobile) => (
     <div
       className={
@@ -868,12 +906,14 @@ const LibraryOccupancy = () => {
           getBarColor={getBarColor}
           getColorFromOccupancy={getColorFromOccupancy}
           isMobile={isMobile}
+          // Pass commitTime only to the FIRST card
+          commitTimeProp={id === "first" ? commitTime : null}
         />
       ))}
     </div>
   );
 
-  // Floor plan image logic (desktop hover)
+  // Hover-based floor plan image
   const getImageSrc = () => {
     if (!isMobile) {
       if (hoveredCard === "first") return "/2.png";
@@ -886,11 +926,7 @@ const LibraryOccupancy = () => {
     return "/1.png";
   };
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // LAYOUT (MOBILE vs. DESKTOP)
-  // ───────────────────────────────────────────────────────────────────────────
-
-  // MOBILE
+  // MOBILE layout
   if (isMobile) {
     return (
       <div className="flex flex-col items-center min-h-screen bg-gray-100 p-4">
@@ -899,9 +935,17 @@ const LibraryOccupancy = () => {
         </h1>
         <p className="text-center text-gray-600 mb-4 px-4">
           This project is a serverless application to predict the seating at the KTH library.
+          Learn more{" "}
+          <a
+            href="https://www.kth.se/en/biblioteket/anvanda-biblioteket/oppettider-kontakt/besokare-i-realtid-1.1078198"
+            className="text-blue-500 underline"
+          >
+            here
+          </a>
+          .
         </p>
 
-        {/* Immagine del piano */}
+        {/* Floor plan image */}
         <div className="w-full max-w-md mb-6">
           <img
             src={getImageSrc()}
@@ -910,7 +954,7 @@ const LibraryOccupancy = () => {
           />
         </div>
 
-        {/* Sezione meteo e countdown esami */}
+        {/* Weather + exams countdown */}
         {weather && (
           <div className="w-full max-w-md mb-6 flex flex-col gap-2">
             <div className="flex items-center justify-center gap-4 p-4 bg-white rounded-lg shadow-md">
@@ -928,16 +972,16 @@ const LibraryOccupancy = () => {
           </div>
         )}
 
-        {/* Cards in colonna per mobile */}
+        {/* Cards */}
         {renderCards(true)}
 
-        {/* OccupancyComparison shown in mobile as well */}
+        {/* Real vs Predicted */}
         <OccupancyComparison isMobile={isMobile} />
       </div>
     );
   }
 
-  // DESKTOP
+  // DESKTOP layout
   return (
     <div className="flex flex-col items-center min-h-screen bg-gray-100 p-4">
       <h1 className="text-4xl font-bold text-gray-800 mb-8">
@@ -945,14 +989,22 @@ const LibraryOccupancy = () => {
       </h1>
       <p className="text-center text-gray-600 mb-4">
         This project is a serverless application to predict the seating at the KTH library.
+        Learn more{" "}
+        <a
+          href="https://www.kth.se/en/biblioteket/anvanda-biblioteket/oppettider-kontakt/besokare-i-realtid-1.1078198"
+          className="text-blue-500 underline"
+        >
+          here
+        </a>
+        .
       </p>
 
       <div className="bg-white rounded-xl shadow-2xl p-4 w-full max-w-[1200px]">
         <div className="flex flex-row items-center justify-center gap-6">
-          {/* Griglia con 6 card */}
+          {/* 6 Occupancy Cards */}
           {renderCards(false)}
 
-          {/* Sezione immagine, meteo e countdown esami */}
+          {/* Floor plan, weather, exams countdown */}
           <div className="flex flex-col items-center w-[500px]">
             <img
               src={getImageSrc()}
@@ -977,7 +1029,7 @@ const LibraryOccupancy = () => {
         </div>
       </div>
 
-      {/* OccupancyComparison below the main cards */}
+      {/* Occupancy Comparison below */}
       <OccupancyComparison isMobile={isMobile} />
     </div>
   );
