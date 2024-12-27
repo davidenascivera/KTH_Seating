@@ -131,7 +131,7 @@ const OccupancyCard = React.memo(
 // ─────────────────────────────────────────────────────────────────────────────
 // 2) OccupancyComparison (updated to show Real vs Predicted from new CSV)
 // ─────────────────────────────────────────────────────────────────────────────
-const OccupancyComparison = () => {
+const OccupancyComparison = ({ isMobile }) => {
   // Set 'main' to true to make it the default visible graph
   const [visibleLines, setVisibleLines] = useState({
     main: true,
@@ -144,6 +144,8 @@ const OccupancyComparison = () => {
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [parsedData, setParsedData] = useState([]);
+  const [rmeData, setRmeData] = useState({});
+  const [mapeData, setMapeData] = useState({});
 
   // Colors for each area (real vs predicted).
   // If you want different colors for "real" and "predicted," define them separately here.
@@ -189,20 +191,45 @@ const OccupancyComparison = () => {
         const rows = csvText.split("\n").filter((r) => r.trim() !== "");
 
         // The first row is the header
-        const header = rows[0].split(",");
+        const header = rows[0].split(",").map(h => h.trim());
 
-        // Then parse the rest
-        const data = rows.slice(1).map((row) => {
+        // Identify the indices for RME and MAPE
+        const rmeIndex = rows.findIndex(row => row.startsWith("RME"));
+        const mapeIndex = rows.findIndex(row => row.startsWith("MAPE"));
+
+        // Parse time-series data (exclude RME and MAPE)
+        const timeSeriesRows = rows.slice(1, Math.min(rmeIndex, mapeIndex));
+        const timeSeriesData = timeSeriesRows.map((row) => {
           const cols = row.split(",");
           const obj = {};
           header.forEach((colName, idx) => {
             // Try converting to number if possible
-            obj[colName.trim()] = isNaN(cols[idx]) ? cols[idx] : Number(cols[idx]);
+            obj[colName] = isNaN(cols[idx]) ? cols[idx] : Number(cols[idx]);
           });
           return obj;
         });
 
-        setParsedData(data);
+        // Parse RME data
+        const rmeRow = rows[rmeIndex].split(",");
+        const rmeObj = {};
+        header.forEach((colName, idx) => {
+          if (colName !== "Time") { // Exclude the 'Time' column
+            rmeObj[colName] = isNaN(rmeRow[idx]) ? rmeRow[idx] : Number(rmeRow[idx]);
+          }
+        });
+
+        // Parse MAPE data
+        const mapeRow = rows[mapeIndex].split(",");
+        const mapeObj = {};
+        header.forEach((colName, idx) => {
+          if (colName !== "Time") { // Exclude the 'Time' column
+            mapeObj[colName] = isNaN(mapeRow[idx]) ? mapeRow[idx] : Number(mapeRow[idx]);
+          }
+        });
+
+        setParsedData(timeSeriesData);
+        setRmeData(rmeObj);
+        setMapeData(mapeObj);
       } catch (error) {
         console.error("Error fetching Real-vs-Predicted CSV:", error);
       }
@@ -220,6 +247,99 @@ const OccupancyComparison = () => {
       return newState;
     });
   };
+
+  // Determine the currently visible area
+  const currentVisibleAreaKey = Object.keys(visibleLines).find(key => visibleLines[key]) || "main";
+  const currentArea = labelMap.find(({ key }) => key === currentVisibleAreaKey);
+  const currentAreaLabel = currentArea ? currentArea.label : "Main";
+
+  if (isMobile) {
+    // List of all areas to iterate over
+    const areas = [
+      { key: "main", label: "Main" },
+      { key: "southEast", label: "SouthEast" },
+      { key: "north", label: "North" },
+      { key: "south", label: "South" },
+      { key: "angdomen", label: "Angdomen" },
+      { key: "newton", label: "Newton" }
+    ];
+
+    return (
+      <div className="mt-8 w-full max-w-4xl">
+        {/* Simple heading without toggle */}
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Occupancy Comparison</h2>
+        <p className="text-gray-700 mb-4">
+          Real vs Predicted Occupancy for Each Area
+        </p>
+
+        {/* Render each area's graph sequentially */}
+        {areas.map((area, index) => (
+          <div key={area.key} className="mb-8">
+            {/* Title and Index */}
+            <div className="flex items-center mb-2">
+              <span className="text-lg font-semibold mr-2">{index + 1}.</span>
+              <h3 className="text-lg font-bold text-gray-700">{area.label}</h3>
+            </div>
+
+            {/* Line Chart for the specific area */}
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={parsedData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="Time"
+                    height={60}
+                    tick={{
+                      angle: -45,
+                      textAnchor: "end",
+                      fontSize: 12
+                    }}
+                  />
+                  <YAxis domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
+                  <Tooltip />
+                  <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: "20px" }} />
+
+                  {/* Real Line */}
+                  <Line
+                    type="monotone"
+                    dataKey={`Occupancy_${area.key}_real`}
+                    name={`${area.label} (Real)`}
+                    stroke={colors[`Occupancy_${area.key}_real`]}
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                  {/* Predicted Line */}
+                  <Line
+                    type="monotone"
+                    dataKey={`Occupancy_${area.key}_predicted`}
+                    name={`${area.label} (Predicted)`}
+                    stroke={colors[`Occupancy_${area.key}_predicted`]}
+                    strokeWidth={2}
+                    strokeDasharray="4 2"
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+
+              {/* MAPE/RME Information */}
+              <div className="mt-2 text-sm text-gray-600">
+                <p>
+                  <span className="font-semibold">MAPE:</span>{" "}
+                  {mapeData[`Occupancy_${area.key}_predicted`] ? `${mapeData[`Occupancy_${area.key}_predicted`].toFixed(2)}%` : "N/A"}
+                </p>
+                <p>
+                  <span className="font-semibold">RME:</span>{" "}
+                  {rmeData[`Occupancy_${area.key}_predicted`] ? `${rmeData[`Occupancy_${area.key}_predicted`].toFixed(2)}%` : "N/A"}
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="mt-8 w-full max-w-4xl">
@@ -252,13 +372,13 @@ const OccupancyComparison = () => {
             <p className="mb-2">
               This is the prediction made yesterday versus the real occupancy we had yesterday.
             </p>
-            <div className="flex gap-4 text-sm">
-              <span className="font-semibold">
-                RME: <span className="text-blue-600">4.3%</span>
-              </span>
-              <span className="font-semibold">
-                MAPE: <span className="text-blue-600">6.8%</span>
-              </span>
+            {/* Dynamic RME and MAPE Display for the Active Area */}
+            <div className="flex flex-wrap gap-4 text-sm">
+              <div className="font-semibold">
+                {currentAreaLabel}:
+                <span className="text-blue-600"> RME: {rmeData[`Occupancy_${currentVisibleAreaKey}_predicted`] ? `${rmeData[`Occupancy_${currentVisibleAreaKey}_predicted`].toFixed(2)}%` : "N/A"}</span>
+                <span className="text-blue-600 ml-2">MAPE: {mapeData[`Occupancy_${currentVisibleAreaKey}_predicted`] ? `${mapeData[`Occupancy_${currentVisibleAreaKey}_predicted`].toFixed(2)}%` : "N/A"}</span>
+              </div>
             </div>
           </div>
 
@@ -479,6 +599,7 @@ const LibraryOccupancy = () => {
     angdomen: 0,
     newton: 0
   });
+  const [isFirebaseInitialized, setIsFirebaseInitialized] = useState(false);
 
   // Check if screen is mobile
   useEffect(() => {
@@ -498,25 +619,84 @@ const LibraryOccupancy = () => {
     };
   }, []);
 
-  // Fetch data (Firebase + CSV) + Weather
+  // Separate Firebase initialization
   useEffect(() => {
-    // Listener su Firebase
-    const occupancyRef = ref(database, "current-occupancy");
-    const unsubscribe = onValue(occupancyRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setRealTimeOccupancy({
-          main: data.main || 0,
-          southEast: data.southEast || 0,
-          north: data.north || 0,
-          south: data.south || 0,
-          angdomen: data.angdomen || 0,
-          newton: data.newton || 0
-        });
-      }
-    });
+    let unsubscribe = null;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
 
-    // Fetch CSV data
+    // Load cached values from localStorage
+    const cachedValues = localStorage.getItem('libraryOccupancy');
+    if (cachedValues) {
+      try {
+        const parsed = JSON.parse(cachedValues);
+        setRealTimeOccupancy(parsed);
+      } catch (e) {
+        console.error('Error parsing cached values:', e);
+      }
+    }
+
+    const initFirebase = async () => {
+      try {
+        const occupancyRef = ref(database, "current-occupancy");
+        
+        // Cleanup previous listener if it exists
+        if (unsubscribe) {
+          unsubscribe();
+        }
+
+        unsubscribe = onValue(occupancyRef, (snapshot) => {
+          const data = snapshot.val();
+          if (data) {
+            const newValues = {
+              main: data.main || 0,
+              southEast: data.southEast || 0,
+              north: data.north || 0,
+              south: data.south || 0,
+              angdomen: data.angdomen || 0,
+              newton: data.newton || 0
+            };
+            
+            // Update state
+            setRealTimeOccupancy(newValues);
+            setIsFirebaseInitialized(true);
+            
+            // Cache values in localStorage
+            localStorage.setItem('libraryOccupancy', JSON.stringify(newValues));
+          }
+        }, (error) => {
+          console.error("Firebase error:", error);
+          retryConnection();
+        });
+      } catch (error) {
+        console.error("Firebase initialization error:", error);
+        retryConnection();
+      }
+    };
+
+    const retryConnection = () => {
+      if (retryCount < MAX_RETRIES) {
+        retryCount++;
+        console.log(`Retrying Firebase connection (${retryCount}/${MAX_RETRIES})...`);
+        setTimeout(initFirebase, 2000 * retryCount); // Exponential backoff
+      } else {
+        setError("Unable to establish real-time connection. Using cached data.");
+      }
+    };
+
+    // Initialize Firebase
+    initFirebase();
+
+    // Cleanup function
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []); // Empty dependency array - only run once
+
+  // Separate effect for CSV and Weather data
+  useEffect(() => {
     const fetchData = async () => {
       try {
         const response = await fetch(
@@ -552,15 +732,16 @@ const LibraryOccupancy = () => {
 
         const currentData = parsedData.find((entry) => entry.time === formattedTime);
         if (currentData) {
-          setCurrentOccupancy(currentData.main); 
-          setRealTimeOccupancy({
-            main: currentData.main,
-            southEast: currentData.southEast,
-            north: currentData.north,
-            south: currentData.south,
-            angdomen: currentData.angdomen,
-            newton: currentData.newton
-          });
+          // Uncomment the following lines if you want to set occupancy based on CSV data
+          // setCurrentOccupancy(currentData.main);
+          // setRealTimeOccupancy({
+          //   main: currentData.main,
+          //   southEast: currentData.southEast,
+          //   north: currentData.north,
+          //   south: currentData.south,
+          //   angdomen: currentData.angdomen,
+          //   newton: currentData.newton
+          // });
         }
       } catch (err) {
         setError(`Error loading data: ${err.message}`);
@@ -569,7 +750,6 @@ const LibraryOccupancy = () => {
       }
     };
 
-    // Fetch weather data
     const fetchWeather = async () => {
       try {
         const response = await fetch(
@@ -582,12 +762,41 @@ const LibraryOccupancy = () => {
       }
     };
 
-    fetchData();
-    fetchWeather();
+    Promise.all([fetchData(), fetchWeather()]).catch(error => {
+      console.error("Error fetching data:", error);
+      setError("Error loading data. Please try again.");
+      setLoading(false);
+    });
+  }, []); // Empty dependency array - only run once
 
-    // Cleanup for the Firebase onValue
-    return () => unsubscribe();
-  }, []);
+  // Show loading until both Firebase and data are ready
+  if (loading || !isFirebaseInitialized) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-red-500 bg-red-100 p-4 rounded-lg">
+          <h3 className="font-bold mb-2">Error</h3>
+          <p>{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Returns a color based on occupancy
   const getColorFromOccupancy = (occupancy) => {
@@ -617,15 +826,12 @@ const LibraryOccupancy = () => {
     if (!condition) return <WiDaySunny className="text-yellow-500" />;
     const code = condition.code;
 
-    if (code >= 1000 && code < 1003) return <WiDaySunny className="text-yellow-500" />;
-    if (code >= 1003 && code < 1063) return <WiCloudy className="text-gray-500" />;
+    if (code === 1000) return <WiDaySunny className="text-yellow-500" />;
+    if (code === 1003) return <WiCloudy className="text-gray-500" />;
     if (code >= 1063 && code < 1200) return <WiRain className="text-blue-500" />;
     if (code >= 1200 && code < 1300) return <WiSnow className="text-blue-300" />;
     return <WiDaySunny className="text-yellow-500" />;
   };
-
-  if (loading) return <div className="text-center mt-10">Loading...</div>;
-  if (error) return <div className="text-red-500">{error}</div>;
 
   // Returns the occupancy data for a specific area
   const getAreaData = (areaKey) => {
@@ -726,7 +932,7 @@ const LibraryOccupancy = () => {
         {renderCards(true)}
 
         {/* OccupancyComparison shown in mobile as well */}
-        <OccupancyComparison />
+        <OccupancyComparison isMobile={isMobile} />
       </div>
     );
   }
@@ -772,7 +978,7 @@ const LibraryOccupancy = () => {
       </div>
 
       {/* OccupancyComparison below the main cards */}
-      <OccupancyComparison />
+      <OccupancyComparison isMobile={isMobile} />
     </div>
   );
 };
