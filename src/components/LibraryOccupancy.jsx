@@ -5,15 +5,15 @@ import { WiDaySunny, WiCloudy, WiRain, WiSnow } from "react-icons/wi";
 import {
   BarChart,
   Bar,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
-  Cell
+  Cell,
+  Legend,
+  LineChart,
+  Line
 } from "recharts";
 
 import { database, ref, onValue } from "./firebase";
@@ -30,7 +30,10 @@ const OccupancyCard = React.memo(
     onLeave,
     getBarColor,
     getColorFromOccupancy,
-    isMobile
+    isMobile,
+    isFirstCard,
+    isTomorrow,
+    onToggleTomorrow
   }) => (
     <div
       className={`bg-white rounded-lg shadow-lg overflow-visible hover:shadow-xl transition-all duration-300 relative ${
@@ -51,6 +54,21 @@ const OccupancyCard = React.memo(
             {occupancy}%
           </div>
         </div>
+
+        {/* If this is the first card, show the "Today / Tomorrow" toggle button */}
+        {isFirstCard && (
+          <div className="mb-1 flex items-center justify-start">
+            <button
+              onClick={onToggleTomorrow}
+              className="px-2 py-1 bg-blue-500 text-white rounded-lg text-sm mr-2"
+            >
+              Toggle Forecast
+            </button>
+            <span className="text-gray-600 text-xs">
+              Currently viewing: {isTomorrow ? "Tomorrow" : "Today"}
+            </span>
+          </div>
+        )}
 
         {/* Wrapper for the bar chart */}
         <div
@@ -631,6 +649,20 @@ const LibraryOccupancy = () => {
 
   // NEW: We'll store the commitTime from the first row of the CSV
   const [commitTime, setCommitTime] = useState(null);
+  const [occupancyDataTomorrow, setOccupancyDataTomorrow] = useState([]);
+  const [isTomorrow, setIsTomorrow] = useState(false);
+
+  // NEW: Format date for display
+  const getFormattedDate = (addDays = 0) => {
+    const date = new Date();
+    date.setDate(date.getDate() + addDays);
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
 
   // Check if screen is mobile
   useEffect(() => {
@@ -804,6 +836,42 @@ const LibraryOccupancy = () => {
     });
   }, []);
 
+  // NEW: fetch tomorrow's data (same CSV for now)
+  useEffect(() => {
+    const fetchTomorrowData = async () => {
+      try {
+        // For now, we are using the same CSV endpoint as an example
+        const response = await fetch(
+          "https://huggingface.co/datasets/davnas/library-occupancy/raw/main/forecast_tomorrow.csv"
+        );
+        const text = await response.text();
+        const rows = text.split("\n");
+
+        const parsed = rows
+          .slice(1)
+          .filter((row) => row.trim() !== "")
+          .map((row) => {
+            const values = row.split(",");
+            return {
+              commitTime: values[0].trim(),
+              time: values[1].trim(),
+              main: parseInt(values[2], 10),
+              southEast: parseInt(values[3], 10),
+              north: parseInt(values[4], 10),
+              south: parseInt(values[5], 10),
+              angdomen: parseInt(values[6], 10),
+              newton: parseInt(values[7], 10)
+            };
+          });
+
+        setOccupancyDataTomorrow(parsed);
+      } catch (error) {
+        console.error("Error fetching tomorrow data:", error);
+      }
+    };
+    fetchTomorrowData();
+  }, []);
+
   if (loading || !isFirebaseInitialized) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -872,7 +940,21 @@ const LibraryOccupancy = () => {
     }));
   };
 
-  // Render 6 cards
+  // Wrap getAreaData so we can optionally use tomorrow's data for the first card
+  const getAreaDataWrapped = (areaKey) => {
+    if (isTomorrow) {
+      return occupancyDataTomorrow.map((entry) => ({
+        time: entry.time,
+        occupancy: entry[areaKey]
+      }));
+    }
+    return occupancyData.map((entry) => ({
+      time: entry.time,
+      occupancy: entry[areaKey]
+    }));
+  };
+
+  // Renders 6 Occupancy Cards
   const renderCards = (isMobile) => (
     <div
       className={
@@ -888,12 +970,12 @@ const LibraryOccupancy = () => {
         { title: "South Gallery", key: "south", id: "fourth" },
         { title: "Ångdomen", key: "angdomen", id: "fifth" },
         { title: "Newton", key: "newton", id: "sixth" }
-      ].map(({ title, key, id }) => (
+      ].map(({ title, key, id }, idx) => (
         <OccupancyCard
           key={id}
           title={title}
           occupancy={realTimeOccupancy[key]}
-          data={getAreaData(key)}
+          data={getAreaDataWrapped(key)}
           onHover={() => !isMobile && setHoveredCard(id)}
           onLeave={() => !isMobile && setHoveredCard(null)}
           getBarColor={getBarColor}
@@ -904,7 +986,7 @@ const LibraryOccupancy = () => {
     </div>
   );
 
-  // Hover-based floor plan image
+  // For desktop only: change image on hover
   const getImageSrc = () => {
     if (!isMobile) {
       if (hoveredCard === "first") return "/2.png";
@@ -935,6 +1017,28 @@ const LibraryOccupancy = () => {
           </a>
           .
         </p>
+
+        {/* NEW: Dynamic title with date for mobile */}
+        <div className="w-full max-w-md mb-6">
+          <div className="flex items-start gap-4">
+            <button
+              onClick={() => setIsTomorrow(!isTomorrow)}
+              className="w-8 h-8 bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors shrink-0 text-sm"
+              aria-label="Toggle Forecast"
+            >
+              {isTomorrow ? "←" : "→"}
+            </button>
+
+            <div className="text-left">
+              <h2 className="text-xl font-bold text-gray-800">
+                {isTomorrow ? 'Tomorrow\'s Forecast' : 'Today\'s Occupancy'}
+              </h2>
+              <p className="text-gray-600 mt-1 text-sm">
+                {getFormattedDate(isTomorrow ? 1 : 0)}
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* Floor plan image */}
         <div className="w-full max-w-md mb-6">
@@ -996,6 +1100,26 @@ const LibraryOccupancy = () => {
       </p>
 
       <div className="bg-white rounded-xl shadow-2xl p-4 w-full max-w-[1200px]">
+        {/* NEW: Flex container for button and title */}
+        <div className="mb-6 flex items-center gap-6">
+          <button
+            onClick={() => setIsTomorrow(!isTomorrow)}
+            className="w-10 h-10 bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors shrink-0"
+            aria-label="Toggle Forecast"
+          >
+            {isTomorrow ? "←" : "→"}
+          </button>
+
+          <div className="text-left">
+            <h2 className="text-2xl font-bold text-gray-800">
+              {isTomorrow ? 'Tomorrow\'s Forecast' : 'Today\'s Occupancy'}
+            </h2>
+            <p className="text-gray-600 mt-1">
+              {getFormattedDate(isTomorrow ? 1 : 0)}
+            </p>
+          </div>
+        </div>
+
         <div className="flex flex-row items-center justify-center gap-6">
           {/* 6 Occupancy Cards */}
           {renderCards(false)}
