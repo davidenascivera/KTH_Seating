@@ -1096,8 +1096,16 @@ const LibraryOccupancy = () => {
         >
           here
         </a>
+        {" "}and{" "}
+        <a
+          href="https://www.kth.se/en/biblioteket/anvanda-biblioteket/oppettider-kontakt/oppettider-och-kontakt"
+          className="text-blue-500 underline"
+        >
+          here
+        </a>
         .
       </p>
+        
 
       <div className="bg-white rounded-xl shadow-2xl p-4 w-full max-w-[1200px]">
         {/* NEW: Flex container for button and title */}
