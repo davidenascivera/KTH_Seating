@@ -292,88 +292,88 @@ const OccupancyComparison = ({ isMobile }) => {
 
     return (
       <div className="mt-8 w-full max-w-4xl">
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Occupancy Comparison</h2>
-        <p className="text-gray-700 mb-4">
-          Real vs Predicted Occupancy for Each Area
-        </p>
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Occupancy Comparison</h2>
+          <p className="text-gray-700 mb-4">
+            Real vs Predicted Occupancy for Each Area
+          </p>
 
-        <div className="bg-white rounded-lg shadow-md p-4 mb-4">
-          <p className="mb-2">
+          <p className="mb-6 text-gray-900">
             This is the prediction made yesterday ({parsedDate}) versus the real occupancy
             we had yesterday.
           </p>
-        </div>
 
-        {areas.map((area, index) => (
-          <div key={area.key} className="mb-8">
-            <div className="flex items-center mb-2">
-              <span className="text-lg font-semibold mr-2">{index + 1}.</span>
-              <h3 className="text-lg font-bold text-gray-700">{area.label}</h3>
-            </div>
+          {areas.map((area, index) => (
+            <div key={area.key} className="mb-8 last:mb-0">
+              <div className="flex items-center mb-2">
+                <span className="text-lg font-semibold mr-2">{index + 1}.</span>
+                <h3 className="text-lg font-bold text-gray-700">{area.label}</h3>
+              </div>
 
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={parsedData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="Time"
-                    height={60}
-                    tick={{
-                      angle: -45,
-                      textAnchor: "end",
-                      fontSize: 12
-                    }}
-                  />
-                  <YAxis
-                    domain={[0, 100]}
-                    tickFormatter={(value) => `${value}%`}
-                  />
-                  <Tooltip />
-                  <Legend
-                    verticalAlign="top"
-                    align="right"
-                    wrapperStyle={{ paddingBottom: "20px" }}
-                  />
+              <div className="bg-white rounded-lg shadow-md p-4">
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={parsedData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="Time"
+                      height={60}
+                      tick={{
+                        angle: -45,
+                        textAnchor: "end",
+                        fontSize: 12
+                      }}
+                    />
+                    <YAxis
+                      domain={[0, 100]}
+                      tickFormatter={(value) => `${value}%`}
+                    />
+                    <Tooltip />
+                    <Legend
+                      verticalAlign="top"
+                      align="right"
+                      wrapperStyle={{ paddingBottom: "20px" }}
+                    />
 
-                  <Line
-                    type="monotone"
-                    dataKey={`Occupancy_${area.key}_real`}
-                    name={`${area.label} (Real)`}
-                    stroke={colors[`Occupancy_${area.key}_real`]}
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{ r: 4 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey={`Occupancy_${area.key}_predicted`}
-                    name={`${area.label} (Predicted --)`}
-                    stroke={colors[`Occupancy_${area.key}_predicted`]}
-                    strokeWidth={2}
-                    strokeDasharray="4 2"
-                    dot={false}
-                    activeDot={{ r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+                    <Line
+                      type="monotone"
+                      dataKey={`Occupancy_${area.key}_real`}
+                      name={`${area.label} (Real)`}
+                      stroke={colors[`Occupancy_${area.key}_real`]}
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey={`Occupancy_${area.key}_predicted`}
+                      name={`${area.label} (Predicted)`}
+                      stroke={colors[`Occupancy_${area.key}_predicted`]}
+                      strokeWidth={2}
+                      strokeDasharray="4 2"
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
 
-              <div className="mt-2 text-sm text-gray-600">
-                <p>
-                  <span className="font-semibold">MAPE:</span>{" "}
-                  {mapeData[`Occupancy_${area.key}_predicted`]
-                    ? `${mapeData[`Occupancy_${area.key}_predicted`].toFixed(2)}%`
-                    : "N/A"}
-                </p>
-                <p>
-                  <span className="font-semibold">RME:</span>{" "}
-                  {rmeData[`Occupancy_${area.key}_predicted`]
-                    ? `${rmeData[`Occupancy_${area.key}_predicted`].toFixed(2)}%`
-                    : "N/A"}
-                </p>
+                <div className="mt-2 text-sm text-gray-600">
+                  <p>
+                    <span className="font-semibold">MAPE:</span>{" "}
+                    {mapeData[`Occupancy_${area.key}_predicted`]
+                      ? `${mapeData[`Occupancy_${area.key}_predicted`].toFixed(2)}%`
+                      : "N/A"}
+                  </p>
+                  <p>
+                    <span className="font-semibold">RME:</span>{" "}
+                    {rmeData[`Occupancy_${area.key}_predicted`]
+                      ? `${rmeData[`Occupancy_${area.key}_predicted`].toFixed(2)}%`
+                      : "N/A"}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     );
   }
@@ -481,7 +481,7 @@ const OccupancyComparison = ({ isMobile }) => {
                       <Line
                         type="monotone"
                         dataKey="Occupancy_main_predicted"
-                        name="Main (Predicted --)"
+                        name="Main (Predicted)"
                         stroke={colors["Occupancy_main_predicted"]}
                         strokeWidth={2}
                         strokeDasharray="4 2"
@@ -506,7 +506,7 @@ const OccupancyComparison = ({ isMobile }) => {
                       <Line
                         type="monotone"
                         dataKey="Occupancy_southEast_predicted"
-                        name="SouthEast (Predicted --)"
+                        name="SouthEast (Predicted)"
                         stroke={colors["Occupancy_southEast_predicted"]}
                         strokeWidth={2}
                         strokeDasharray="4 2"
@@ -531,7 +531,7 @@ const OccupancyComparison = ({ isMobile }) => {
                       <Line
                         type="monotone"
                         dataKey="Occupancy_north_predicted"
-                        name="North (Predicted --)"
+                        name="North (Predicted)"
                         stroke={colors["Occupancy_north_predicted"]}
                         strokeWidth={2}
                         strokeDasharray="4 2"
@@ -556,7 +556,7 @@ const OccupancyComparison = ({ isMobile }) => {
                       <Line
                         type="monotone"
                         dataKey="Occupancy_south_predicted"
-                        name="South (Predicted --)"
+                        name="South (Predicted)"
                         stroke={colors["Occupancy_south_predicted"]}
                         strokeWidth={2}
                         strokeDasharray="4 2"
@@ -581,7 +581,7 @@ const OccupancyComparison = ({ isMobile }) => {
                       <Line
                         type="monotone"
                         dataKey="Occupancy_angdomen_predicted"
-                        name="Ångdomen (Predicted --)"
+                        name="Ångdomen (Predicted)"
                         stroke={colors["Occupancy_angdomen_predicted"]}
                         strokeWidth={2}
                         strokeDasharray="4 2"
@@ -606,7 +606,7 @@ const OccupancyComparison = ({ isMobile }) => {
                       <Line
                         type="monotone"
                         dataKey="Occupancy_newton_predicted"
-                        name="Newton (Predicted --)"
+                        name="Newton (Predicted)"
                         stroke={colors["Occupancy_newton_predicted"]}
                         strokeWidth={2}
                         strokeDasharray="4 2"
@@ -1018,64 +1018,67 @@ const LibraryOccupancy = () => {
           .
         </p>
 
-        {/* NEW: Dynamic title with date for mobile */}
-        <div className="w-full max-w-md mb-6">
-          <div className="flex items-start gap-4">
-            <button
-              onClick={() => setIsTomorrow(!isTomorrow)}
-              className="w-8 h-8 bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors shrink-0 text-sm"
-              aria-label="Toggle Forecast"
-            >
-              {isTomorrow ? "←" : "→"}
-            </button>
+        {/* Main white container wrapping all content */}
+        <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-4 mb-4">
+          {/* NEW: Dynamic title with date for mobile */}
+          <div className="mb-6">
+            <div className="flex items-start gap-4">
+              <button
+                onClick={() => setIsTomorrow(!isTomorrow)}
+                className="w-8 h-8 bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600 transition-colors shrink-0 text-sm"
+                aria-label="Toggle Forecast"
+              >
+                {isTomorrow ? "←" : "→"}
+              </button>
 
-            <div className="text-left">
-              <h2 className="text-xl font-bold text-gray-800">
-                {isTomorrow ? 'Tomorrow\'s Forecast' : 'Today\'s Occupancy'}
-              </h2>
-              <p className="text-gray-600 mt-1 text-sm">
-                {getFormattedDate(isTomorrow ? 1 : 0)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Floor plan image */}
-        <div className="w-full max-w-md mb-6">
-          <img
-            src={getImageSrc()}
-            alt="Floor plan"
-            className="w-full h-auto rounded-lg"
-          />
-        </div>
-
-        {/* Weather + exams countdown */}
-        {weather && (
-          <div className="w-full max-w-md mb-6 flex flex-col gap-2">
-            <div className="flex items-center justify-center gap-4 p-4 bg-white rounded-lg shadow-md">
-              <div className="text-5xl">{getWeatherIcon(weather.condition)}</div>
-              <div className="text-gray-800">
-                <p className="text-xl font-semibold">{weather.temp_c}°C</p>
-                <p className="text-sm">{weather.condition?.text}</p>
+              <div className="text-left">
+                <h2 className="text-xl font-bold text-gray-800">
+                  {isTomorrow ? 'Tomorrow\'s Forecast' : 'Today\'s Occupancy'}
+                </h2>
+                <p className="text-gray-600 mt-1 text-sm">
+                  {getFormattedDate(isTomorrow ? 1 : 0)}
+                </p>
               </div>
             </div>
-            <div className="p-4 bg-white rounded-lg shadow-md text-center flex flex-col gap-1">
-              <p className="text-lg font-bold text-gray-800">
-                Days until exams: <span className="text-blue-600">10</span>
-              </p>
-              {commitTime && (
-                <p className="text-xs text-gray-400">
-                  Last updated: {commitTime}
-                </p>
-              )}
-            </div>
           </div>
-        )}
 
-        {/* Cards */}
-        {renderCards(true)}
+          {/* Floor plan image */}
+          <div className="mb-6">
+            <img
+              src={getImageSrc()}
+              alt="Floor plan"
+              className="w-full h-auto rounded-lg"
+            />
+          </div>
 
-        {/* Real vs Predicted */}
+          {/* Weather + exams countdown */}
+          {weather && (
+            <div className="mb-6 flex flex-col gap-2">
+              <div className="flex items-center justify-center gap-4 p-4 bg-white rounded-lg shadow-md">
+                <div className="text-5xl">{getWeatherIcon(weather.condition)}</div>
+                <div className="text-gray-800">
+                  <p className="text-xl font-semibold">{weather.temp_c}°C</p>
+                  <p className="text-sm">{weather.condition?.text}</p>
+                </div>
+              </div>
+              <div className="p-4 bg-white rounded-lg shadow-md text-center flex flex-col gap-1">
+                <p className="text-lg font-bold text-gray-800">
+                  Days until exams: <span className="text-blue-600">10</span>
+                </p>
+                {commitTime && (
+                  <p className="text-xs text-gray-400">
+                    Last updated: {commitTime}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Cards */}
+          {renderCards(true)}
+        </div>
+
+        {/* Real vs Predicted - now outside the main container */}
         <OccupancyComparison isMobile={isMobile} />
       </div>
     );
