@@ -346,7 +346,7 @@ const OccupancyComparison = ({ isMobile }) => {
                     <Line
                       type="monotone"
                       dataKey={`Occupancy_${area.key}_predicted`}
-                      name={`${area.label} (Predicted)`}
+                      name={`${area.label} (Predicted --)`}
                       stroke={colors[`Occupancy_${area.key}_predicted`]}
                       strokeWidth={2}
                       strokeDasharray="4 2"
@@ -481,7 +481,7 @@ const OccupancyComparison = ({ isMobile }) => {
                       <Line
                         type="monotone"
                         dataKey="Occupancy_main_predicted"
-                        name="Main (Predicted)"
+                        name="Main (Predicted --)"
                         stroke={colors["Occupancy_main_predicted"]}
                         strokeWidth={2}
                         strokeDasharray="4 2"
@@ -506,7 +506,7 @@ const OccupancyComparison = ({ isMobile }) => {
                       <Line
                         type="monotone"
                         dataKey="Occupancy_southEast_predicted"
-                        name="SouthEast (Predicted)"
+                        name="SouthEast (Predicted --)"
                         stroke={colors["Occupancy_southEast_predicted"]}
                         strokeWidth={2}
                         strokeDasharray="4 2"
@@ -531,7 +531,7 @@ const OccupancyComparison = ({ isMobile }) => {
                       <Line
                         type="monotone"
                         dataKey="Occupancy_north_predicted"
-                        name="North (Predicted)"
+                        name="North (Predicted --)"
                         stroke={colors["Occupancy_north_predicted"]}
                         strokeWidth={2}
                         strokeDasharray="4 2"
@@ -556,7 +556,7 @@ const OccupancyComparison = ({ isMobile }) => {
                       <Line
                         type="monotone"
                         dataKey="Occupancy_south_predicted"
-                        name="South (Predicted)"
+                        name="South (Predicted --)"
                         stroke={colors["Occupancy_south_predicted"]}
                         strokeWidth={2}
                         strokeDasharray="4 2"
@@ -581,7 +581,7 @@ const OccupancyComparison = ({ isMobile }) => {
                       <Line
                         type="monotone"
                         dataKey="Occupancy_angdomen_predicted"
-                        name="Ångdomen (Predicted)"
+                        name="Ångdomen (Predicted --)"
                         stroke={colors["Occupancy_angdomen_predicted"]}
                         strokeWidth={2}
                         strokeDasharray="4 2"
@@ -606,7 +606,7 @@ const OccupancyComparison = ({ isMobile }) => {
                       <Line
                         type="monotone"
                         dataKey="Occupancy_newton_predicted"
-                        name="Newton (Predicted)"
+                        name="Newton (Predicted --)"
                         stroke={colors["Occupancy_newton_predicted"]}
                         strokeWidth={2}
                         strokeDasharray="4 2"
