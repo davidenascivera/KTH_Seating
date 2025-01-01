@@ -196,62 +196,77 @@ const OccupancyComparison = ({ isMobile }) => {
         const response = await fetch(
           "https://huggingface.co/datasets/davnas/library-occupancy/resolve/main/Real_vs_Predicted_Occupancy_Data.csv"
         );
-        const csvText = await response.text();
-        const rows = csvText.split("\n").filter((r) => r.trim() !== "");
+        const text = await response.text();
+        const rows = text.split("\n").filter((r) => r.trim() !== "");
 
         if (rows.length === 0) {
           throw new Error("CSV is empty");
         }
 
         const header = rows[0].split(",").map((h) => h.trim());
-        const rmeIndex = rows.findIndex((row) => row.split(",")[1] === "RME");
-        const mapeIndex = rows.findIndex((row) => row.split(",")[1] === "MAPE");
+        
+        // Find RME and MAPE rows - look for exact matches
+        const rmeRowIndex = rows.findIndex(row => row.includes(',RME,'));
+        const mapeRowIndex = rows.findIndex(row => row.includes(',MAPE,'));
 
-        if (rmeIndex === -1 || mapeIndex === -1) {
-          throw new Error("RME or MAPE rows not found in CSV");
-        }
+        // Get time series data (exclude RME and MAPE rows)
+        const timeSeriesRows = rows.slice(1, rmeRowIndex);
 
-        // Exclude RME and MAPE rows
-        const timeSeriesRows = rows.slice(1, Math.min(rmeIndex, mapeIndex));
         const timeSeriesData = timeSeriesRows.map((row) => {
-          const cols = row.split(",");
+          const cols = row.split(",").map(val => val.trim());
           const obj = {};
           header.forEach((colName, idx) => {
-            obj[colName] = isNaN(cols[idx]) ? cols[idx] : Number(cols[idx]);
+            // Convert string numbers to actual numbers, handling decimal points
+            obj[colName] = colName !== 'Date' && colName !== 'Time' 
+              ? parseFloat(cols[idx]) || 0 
+              : cols[idx];
           });
           return obj;
         });
 
-        // Extract a date from the first row
+        // Extract date from first row
         const firstDateEntry = timeSeriesRows[0]?.split(",")[0]?.trim();
         setParsedDate(firstDateEntry || "unknown date");
 
         // Parse RME
-        const rmeRow = rows[rmeIndex].split(",");
-        const rmeObj = {};
-        header.forEach((colName, idx) => {
-          if (colName !== "Date" && colName !== "Time") {
-            rmeObj[colName] = isNaN(rmeRow[idx]) ? rmeRow[idx] : Number(rmeRow[idx]);
-          }
-        });
+        if (rmeRowIndex !== -1) {
+          const rmeValues = rows[rmeRowIndex].split(",").map(val => val.trim());
+          const rmeObj = {};
+          header.forEach((colName, idx) => {
+            if (colName.includes('predicted')) {
+              rmeObj[colName] = parseFloat(rmeValues[idx]) || 0;
+            }
+          });
+          setRmeData(rmeObj);
+        }
 
         // Parse MAPE
-        const mapeRow = rows[mapeIndex].split(",");
-        const mapeObj = {};
-        header.forEach((colName, idx) => {
-          if (colName !== "Date" && colName !== "Time") {
-            mapeObj[colName] = isNaN(mapeRow[idx]) ? mapeRow[idx] : Number(mapeRow[idx]);
-          }
-        });
+        if (mapeRowIndex !== -1) {
+          const mapeValues = rows[mapeRowIndex].split(",").map(val => val.trim());
+          const mapeObj = {};
+          header.forEach((colName, idx) => {
+            if (colName.includes('predicted')) {
+              mapeObj[colName] = parseFloat(mapeValues[idx]) || 0;
+            }
+          });
+          setMapeData(mapeObj);
+        }
 
         setParsedData(timeSeriesData);
-        setRmeData(rmeObj);
-        setMapeData(mapeObj);
+        
+        // Add this debug log:
+        console.log('Parsed Data:', {
+          timeSeriesData: timeSeriesData,
+          rmeData: rmeData,
+          mapeData: mapeData
+        });
+
       } catch (error) {
         console.error("Error fetching Real-vs-Predicted CSV:", error);
         setError("Failed to load occupancy comparison data.");
       }
     };
+
     fetchData();
   }, []);
 
@@ -359,13 +374,13 @@ const OccupancyComparison = ({ isMobile }) => {
                 <div className="mt-2 text-sm text-gray-600">
                   <p>
                     <span className="font-semibold">MAPE:</span>{" "}
-                    {mapeData[`Occupancy_${area.key}_predicted`]
+                    {typeof mapeData[`Occupancy_${area.key}_predicted`] !== 'undefined'
                       ? `${mapeData[`Occupancy_${area.key}_predicted`].toFixed(2)}%`
                       : "N/A"}
                   </p>
                   <p>
                     <span className="font-semibold">RME:</span>{" "}
-                    {rmeData[`Occupancy_${area.key}_predicted`]
+                    {typeof rmeData[`Occupancy_${area.key}_predicted`] !== 'undefined'
                       ? `${rmeData[`Occupancy_${area.key}_predicted`].toFixed(2)}%`
                       : "N/A"}
                   </p>
@@ -417,13 +432,13 @@ const OccupancyComparison = ({ isMobile }) => {
                 <span className="text-blue-600">
                   {" "}
                   RME:{" "}
-                  {rmeData[`Occupancy_${currentVisibleAreaKey}_predicted`]
+                  {typeof rmeData[`Occupancy_${currentVisibleAreaKey}_predicted`] !== 'undefined'
                     ? `${rmeData[`Occupancy_${currentVisibleAreaKey}_predicted`].toFixed(2)}%`
                     : "N/A"}
                 </span>
                 <span className="text-blue-600 ml-2">
                   MAPE:{" "}
-                  {mapeData[`Occupancy_${currentVisibleAreaKey}_predicted`]
+                  {typeof mapeData[`Occupancy_${currentVisibleAreaKey}_predicted`] !== 'undefined'
                     ? `${mapeData[`Occupancy_${currentVisibleAreaKey}_predicted`].toFixed(2)}%`
                     : "N/A"}
                 </span>
