@@ -922,26 +922,26 @@ const LibraryOccupancy = () => {
   };
 
   const getBarColor = (time) => {
-    const timeHour = parseInt(time.split(":")[0], 10);
-    const timeMinute = parseInt(time.split(":")[1], 10);
-    const currentDate = new Date();
-    const currentHour = currentDate.getHours();
-    const currentMinute = currentDate.getMinutes();
-
-    // Convert times to minutes since midnight for easier comparison
-    const timeInMinutes = (timeHour * 60) + timeMinute;
-    const currentTimeInMinutes = (currentHour * 60) + currentMinute;
-
-    // Only highlight the exact current time slot
-    if (timeHour === currentHour && Math.abs(timeMinute - currentMinute) < 30) {
-      return getColorFromOccupancy(currentOccupancy);
-    } else if (timeInMinutes < currentTimeInMinutes) {
-      // Past hours (darker blue)
-      return "#4285F4";
-    } else {
-      // Future hours (lighter blue)
-      return "#bfdbfe";
+    const [timeHour, timeMinute] = time.split(":").map(num => parseInt(num, 10));
+    const currentTime = new Date();
+    const currentHour = currentTime.getHours();
+    const currentMinute = currentTime.getMinutes();
+    
+    // Round current time to nearest 30 minutes
+    const roundedCurrentMinute = Math.floor(currentMinute / 30) * 30;
+    
+    // Check if this is the current time slot
+    if (timeHour === currentHour && timeMinute === roundedCurrentMinute) {
+      return getColorFromOccupancy(realTimeOccupancy.main);
     }
+    
+    // Past times
+    if (timeHour < currentHour || (timeHour === currentHour && timeMinute < roundedCurrentMinute)) {
+      return "#4285F4"; // darker blue
+    }
+    
+    // Future times
+    return "#bfdbfe"; // lighter blue
   };
 
   // Weather icon
