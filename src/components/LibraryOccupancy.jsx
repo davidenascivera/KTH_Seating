@@ -922,26 +922,26 @@ const LibraryOccupancy = () => {
   };
 
   const getBarColor = (time) => {
-    const [timeHour, timeMinute] = time.split(":").map(num => parseInt(num, 10));
-    const currentTime = new Date();
-    const currentHour = currentTime.getHours();
-    const currentMinute = currentTime.getMinutes();
-    
-    // Round current time to nearest 30 minutes
-    const roundedCurrentMinute = Math.floor(currentMinute / 30) * 30;
-    
-    // Check if this is the current time slot
-    if (timeHour === currentHour && timeMinute === roundedCurrentMinute) {
-      return getColorFromOccupancy(realTimeOccupancy.main);
+    const timeHour = parseInt(time.split(":")[0], 10);
+    const timeMinute = parseInt(time.split(":")[1], 10);
+    const currentDate = new Date();
+    const currentHour = currentDate.getHours();
+    const currentMinute = currentDate.getMinutes();
+
+    // Convert times to minutes since midnight for easier comparison
+    const timeInMinutes = (timeHour * 60) + timeMinute;
+    const currentTimeInMinutes = (currentHour * 60) + currentMinute;
+
+    // Only highlight the exact current time slot
+    if (timeHour === currentHour && Math.abs(timeMinute - currentMinute) < 30) {
+      return getColorFromOccupancy(currentOccupancy);
+    } else if (timeInMinutes < currentTimeInMinutes) {
+      // Past hours (darker blue)
+      return "#4285F4";
+    } else {
+      // Future hours (lighter blue)
+      return "#bfdbfe";
     }
-    
-    // Past times
-    if (timeHour < currentHour || (timeHour === currentHour && timeMinute < roundedCurrentMinute)) {
-      return "#4285F4"; // darker blue
-    }
-    
-    // Future times
-    return "#bfdbfe"; // lighter blue
   };
 
   // Weather icon
@@ -989,10 +989,10 @@ const LibraryOccupancy = () => {
       {[
         { title: "KTH LIBRARY", key: "main", id: "first" },
         { title: "South-East Gallery", key: "southEast", id: "second" },
-        { title: "North Gallery", key: "north", id: "third" },
+        { title: "Newton", key: "newton", id: "third" },
         { title: "South Gallery", key: "south", id: "fourth" },
         { title: "Ångdomen", key: "angdomen", id: "fifth" },
-        { title: "Newton", key: "newton", id: "sixth" }
+        { title: "North Gallery", key: "north", id: "sixth" }
       ].map(({ title, key, id }, idx) => (
         <OccupancyCard
           key={id}
@@ -1014,10 +1014,10 @@ const LibraryOccupancy = () => {
     if (!isMobile) {
       if (hoveredCard === "first") return "/2.png";
       if (hoveredCard === "second") return "/3.png";
-      if (hoveredCard === "third") return "/4.png";
+      if (hoveredCard === "third") return "/7.png"; // Changed to Newton's image
       if (hoveredCard === "fourth") return "/5.png";
       if (hoveredCard === "fifth") return "/6.png";
-      if (hoveredCard === "sixth") return "/7.png";
+      if (hoveredCard === "sixth") return "/4.png"; // Changed to North Gallery's image
     }
     return "/1.png";
   };
