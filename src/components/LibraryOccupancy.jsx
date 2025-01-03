@@ -923,13 +923,21 @@ const LibraryOccupancy = () => {
 
   const getBarColor = (time) => {
     const timeHour = parseInt(time.split(":")[0], 10);
-    const currentTimeHour = parseInt(currentHour.split(":")[0], 10);
+    const timeMinute = parseInt(time.split(":")[1], 10);
+    const currentDate = new Date();
+    const currentHour = currentDate.getHours();
+    const currentMinute = currentDate.getMinutes();
 
-    if (time === currentHour) {
+    // Convert times to minutes since midnight for easier comparison
+    const timeInMinutes = (timeHour * 60) + timeMinute;
+    const currentTimeInMinutes = (currentHour * 60) + currentMinute;
+
+    // Only highlight the exact current time slot
+    if (timeHour === currentHour && Math.abs(timeMinute - currentMinute) < 30) {
       return getColorFromOccupancy(currentOccupancy);
-    } else if (timeHour < currentTimeHour) {
-      // Past hours (light blue)
-      return "#93c5fd";
+    } else if (timeInMinutes < currentTimeInMinutes) {
+      // Past hours (darker blue)
+      return "#4285F4";
     } else {
       // Future hours (lighter blue)
       return "#bfdbfe";
