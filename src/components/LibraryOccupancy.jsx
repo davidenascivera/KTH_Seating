@@ -922,25 +922,27 @@ const LibraryOccupancy = () => {
   };
 
   const getBarColor = (time) => {
+    // If viewing tomorrow's forecast data, show everything in light blue
+    if (isTomorrow) {
+      return "#bfdbfe"; // Light blue for all tomorrow's bars
+    }
+
+    // Original logic for today's data
     const timeHour = parseInt(time.split(":")[0], 10);
     const timeMinute = parseInt(time.split(":")[1], 10);
     const currentDate = new Date();
     const currentHour = currentDate.getHours();
     const currentMinute = currentDate.getMinutes();
 
-    // Convert times to minutes since midnight for easier comparison
     const timeInMinutes = (timeHour * 60) + timeMinute;
     const currentTimeInMinutes = (currentHour * 60) + currentMinute;
 
-    // Only highlight the exact current time slot
     if (timeHour === currentHour && Math.abs(timeMinute - currentMinute) < 30) {
       return getColorFromOccupancy(currentOccupancy);
     } else if (timeInMinutes < currentTimeInMinutes) {
-      // Past hours (darker blue)
-      return "#4285F4";
+      return "#4285F4"; // Dark blue for past hours
     } else {
-      // Future hours (lighter blue)
-      return "#bfdbfe";
+      return "#bfdbfe"; // Light blue for future hours
     }
   };
 
