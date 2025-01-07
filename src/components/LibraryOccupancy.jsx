@@ -927,22 +927,22 @@ const LibraryOccupancy = () => {
       return "#bfdbfe"; // Light blue for all tomorrow's bars
     }
 
-    // Original logic for today's data
     const timeHour = parseInt(time.split(":")[0], 10);
     const timeMinute = parseInt(time.split(":")[1], 10);
     const currentDate = new Date();
     const currentHour = currentDate.getHours();
     const currentMinute = currentDate.getMinutes();
 
-    const timeInMinutes = (timeHour * 60) + timeMinute;
-    const currentTimeInMinutes = (currentHour * 60) + currentMinute;
-
-    if (timeHour === currentHour && Math.abs(timeMinute - currentMinute) < 30) {
+    // Calculate the current 30-minute block
+    const currentBlock = currentMinute < 30 ? 0 : 30;
+    
+    // Only highlight if both hour and minute block match exactly
+    if (timeHour === currentHour && timeMinute === currentBlock) {
       return getColorFromOccupancy(currentOccupancy);
-    } else if (timeInMinutes < currentTimeInMinutes) {
-      return "#4285F4"; // Dark blue for past hours
+    } else if (timeHour < currentHour || (timeHour === currentHour && timeMinute < currentBlock)) {
+      return "#4285F4"; // Dark blue for past
     } else {
-      return "#bfdbfe"; // Light blue for future hours
+      return "#bfdbfe"; // Light blue for future
     }
   };
 
