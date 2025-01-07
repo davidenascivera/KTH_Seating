@@ -33,7 +33,8 @@ const OccupancyCard = React.memo(
     isMobile,
     isFirstCard,
     isTomorrow,
-    onToggleTomorrow
+    onToggleTomorrow,
+    areaKey
   }) => (
     <div
       className={`bg-white rounded-lg shadow-lg overflow-visible hover:shadow-xl transition-all duration-300 relative ${
@@ -129,7 +130,7 @@ const OccupancyCard = React.memo(
                 isAnimationActive={false}
               >
                 {data.map((entry) => (
-                  <Cell key={`cell-${entry.time}`} fill={getBarColor(entry.time)} />
+                  <Cell key={`cell-${entry.time}`} fill={getBarColor(entry.time, areaKey)} />
                 ))}
               </Bar>
             </BarChart>
@@ -921,7 +922,7 @@ const LibraryOccupancy = () => {
     return "#dc2626"; // red
   };
 
-  const getBarColor = (time) => {
+  const getBarColor = (time, areaKey) => {
     // If viewing tomorrow's forecast data, show everything in light blue
     if (isTomorrow) {
       return "#bfdbfe"; // Light blue for all tomorrow's bars
@@ -938,7 +939,8 @@ const LibraryOccupancy = () => {
     
     // Only highlight if both hour and minute block match exactly
     if (timeHour === currentHour && timeMinute === currentBlock) {
-      return getColorFromOccupancy(currentOccupancy);
+      // Use the real-time Firebase value for the specific area
+      return getColorFromOccupancy(realTimeOccupancy[areaKey]);
     } else if (timeHour < currentHour || (timeHour === currentHour && timeMinute < currentBlock)) {
       return "#4285F4"; // Dark blue for past
     } else {
@@ -973,9 +975,16 @@ const LibraryOccupancy = () => {
         occupancy: entry[areaKey]
       }));
     }
+
+    // Get current time block
+    const now = new Date();
+    const currentHour = now.getHours().toString().padStart(2, "0");
+    const currentMinute = now.getMinutes() < 30 ? "00" : "30";
+    const currentTimeBlock = `${currentHour}:${currentMinute}`;
+
     return occupancyData.map((entry) => ({
       time: entry.time,
-      occupancy: entry[areaKey]
+      occupancy: entry.time === currentTimeBlock ? realTimeOccupancy[areaKey] : entry[areaKey]
     }));
   };
 
@@ -1006,6 +1015,7 @@ const LibraryOccupancy = () => {
           getBarColor={getBarColor}
           getColorFromOccupancy={getColorFromOccupancy}
           isMobile={isMobile}
+          areaKey={key}
         />
       ))}
     </div>
